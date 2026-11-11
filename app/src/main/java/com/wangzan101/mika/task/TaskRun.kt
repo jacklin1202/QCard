@@ -10,6 +10,7 @@ import kotlin.random.Random
 import com.wangzan101.mika.core.action.OutwardPacing
 import com.wangzan101.mika.core.cap.phone.OperatingPace
 import com.wangzan101.mika.core.usage.RunUsageTally
+import com.wangzan101.mika.cap.phone.shell.ShellService
 import com.wangzan101.mika.core.shell.AccessibilityRepair
 import com.wangzan101.mika.core.shell.HelperRestart
 import com.wangzan101.mika.ui.StatusCopy
@@ -699,6 +700,22 @@ class TaskRun(
             // 挪回去的 App 原本就在虚拟屏上,屏一定已经建好;没有屏就没有可挪回的
             suspend fun moveBackToAgent(taskId: Int): Boolean {
                 val id = phone?.display?.current?.displayId ?: return false
+                if (id == Display.DEFAULT_DISPLAY) {
+                    // 主屏模式(ldplayer-adapt):任务本来就在主屏上,没有别的屏可挪(挪去同一块屏会失败);
+                    // 「挪回」= 把它重新带到最前面(对已有任务再 start 一次即热带回),再等画面出现
+                    val p = phone ?: return false
+                    val t = p.screen.target.value ?: return false
+                    if (t.taskId != taskId) return false
+                    val code = withContext(Dispatchers.IO) {
+                        runCatching {
+                            if (t.userId >= 0) p.shell.startAppInUser(id, t.packageName, t.userId, false)
+                            else p.shell.startApp(id, t.packageName)
+                        }.getOrDefault(-1)
+                    }
+                    val up = code == ShellService.START_OK || code == ShellService.START_OK_COLD_IGNORED
+                    if (up) p.screen.awaitContent()
+                    return up
+                }
                 return moveTask(taskId, id)
             }
             val app = service.application as MikaApp
