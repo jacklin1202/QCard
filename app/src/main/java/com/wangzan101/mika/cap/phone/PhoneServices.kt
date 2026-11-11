@@ -37,6 +37,11 @@ class PhoneServices(context: Context) {
     /** 任务与启动恢复共用的那条 shell 连接。 */
     val sharedShell = SharedShell { BuiltinShellConnection(hub) { shellManager.need() } }
 
+    /** 主屏模式开关(ldplayer-adapt 分支):打开后任务直接在主屏上做,见 [com.wangzan101.mika.settings.MainDisplayMode]。 */
+    val mainDisplayMode by lazy { com.wangzan101.mika.settings.MainDisplayMode(com.wangzan101.mika.settings.MainDisplayMode.prefs(app)) }
+    /** 主屏模式一次只准一个任务用主屏(ldplayer-adapt):主屏只有一块,后来者在建屏时等这把锁(TaskRun.createMain)。 */
+    val mainDisplayLease = kotlinx.coroutines.sync.Mutex()
+
     /** 常驻虚拟屏(ldplayer-adapt 分支):跨任务保留 Agent 屏,见 [com.wangzan101.mika.cap.phone.display.AgentDisplayStore]。 */
     val displayStore = com.wangzan101.mika.cap.phone.display.AgentDisplayStore(
         holdBinding = { sharedShell.acquire() },

@@ -505,6 +505,10 @@ class TaskRun(
         var afterTask: com.wangzan101.mika.core.uistate.AfterTaskMarks? = null
         // 本分支(ldplayer-adapt):这轮用的是常驻屏时,收尾不放屏、不分流 App(见 AgentDisplayStore)
         var phoneDisplayShared = false
+        // 本分支(ldplayer-adapt):这轮用主屏模式时,收尾同样不动 App,只停主屏取帧(见 MainDisplay)
+        var phoneDisplayMain = false
+        // 这轮有没有拿着主屏租约(PhoneServices.mainDisplayLease):收尾要还,重建屏重试时不要重复拿
+        var phoneDisplayMainLease = false
         var shellDeath: IBinder.DeathRecipient? = null
         var shellBinder: IBinder? = null
         val traces = (service.application as MikaApp).detailedTraces
@@ -601,12 +605,28 @@ class TaskRun(
                     suspend fun buildDisplay() = AgentDisplay(shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, service.getSystemService(DisplayManager::class.java))
                     // 先问常驻屏仓库:有空闲的常驻屏就沿用(不登记进本轮 resources,收尾不放);
                     // 被别的任务占着才走上游老路,自建一块、收尾照放。
-                    suspend fun create(): AgentDisplay = when (val got = phoneServices.displayStore.obtain(key, shell.asBinder()) {
-                        withContext(Dispatchers.IO) { buildDisplay() }
-                    }) {
-                        is com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Shared -> { phoneDisplayShared = true; got.display }
-                        com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Busy -> resources.acquire(Dispatchers.IO, AgentDisplay::release) { buildDisplay() }
+                    // 主屏模式(ldplayer-adapt):不建虚拟屏,直接绑主屏。先把闲置的常驻虚拟屏放掉,
+                    // 免得要开的 App 被判「在别的屏上占用」;取帧的停法见 finally 的 phoneDisplayMain。
+                    suspend fun createMain(): com.wangzan101.mika.cap.phone.display.DisplayHandle {
+                        // 主屏只有一块:先拿租约,别的任务在用主屏就等它收尾(平行任务在虚拟屏上不受影响)
+                        if (!phoneDisplayMainLease) {
+                            phoneServices.mainDisplayLease.lock()
+                            phoneDisplayMainLease = true
+                        }
+                        // 把闲置的常驻虚拟屏放掉,免得要开的 App 被判「在别的屏上占用」;
+                        // 放不掉 = 别的任务正在用那块屏,留着它:两个任务各用各的屏,靠 shell 的占用检查把关
+                        runCatching { phoneServices.displayStore.releaseNow() }
+                        phoneDisplayMain = true
+                        return com.wangzan101.mika.cap.phone.display.MainDisplay(a11y, metrics.widthPixels, metrics.heightPixels, suspended = { handoverRef?.handedOver == true || gate?.movedAwayPending == true || gate?.userOnPagePending == true || _state.value !is TaskState.Running })
                     }
+                    suspend fun create(): com.wangzan101.mika.cap.phone.display.DisplayHandle =
+                        if (phoneServices.mainDisplayMode.enabled.value) createMain()
+                        else when (val got = phoneServices.displayStore.obtain(key, shell.asBinder()) {
+                            withContext(Dispatchers.IO) { buildDisplay() }
+                        }) {
+                            is com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Shared -> { phoneDisplayShared = true; got.display }
+                            com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Busy -> resources.acquire(Dispatchers.IO, AgentDisplay::release) { buildDisplay() }
+                        }
                     try {
                         create()
                     } catch (e: Exception) {
@@ -1019,6 +1039,9 @@ class TaskRun(
         } finally {
             if (resultReadyAtMs == 0L) resultReadyAtMs = SystemClock.elapsedRealtime()
             handoffUnconsumed()
+            // 主屏模式:停掉主屏取帧(屏本身是系统的,不放),再还主屏租约
+            if (phoneDisplayMain) runCatching { phone?.display?.current?.release() }
+            if (phoneDisplayMainLease) runCatching { phoneServices.mainDisplayLease.unlock() }
             side.cancel()
             _frames.value = null
             _webOpen.value = false
@@ -1045,7 +1068,7 @@ class TaskRun(
                 // 前面哪步抛错,屏和网页显示也照放(按建的反序)
                 try {
                     // 先定 Mika 屏上 App 的去留(留下的挪到主屏后面、正在出声的关掉)并释放屏,再还原静音:留下的不会突然出声
-                    val apps = if (phoneDisplayShared) null else phone?.takeIf { !shellDied }?.let { p ->
+                    val apps = if (phoneDisplayShared || phoneDisplayMain) null else phone?.takeIf { !shellDied }?.let { p ->
                         p.display.current?.let { d -> AppsAfterTaskEnd.finish(p.shell, d.displayId, afterTask) }
                     }
                     record?.let { r ->
@@ -1144,6 +1167,79 @@ class TaskRun(
                         if (handoverRef?.handedOver == true) return@collect
                         gate?.onTaskMovedAway()
                         publish(_state.value) // 立即显示暂停,不等下一个改动屏幕的工具
+                    }
+                }
+            }
+        }
+        // 主屏模式(ldplayer-adapt):有人在主屏动手就暂停,走和「挪走」同一条路等用户点继续。两种介入都认:
+        // 一是目标 App 被别的 App 盖住(切去别的 App);二是人手直接在主屏上触摸(系统触摸事件,
+        // TYPE_TOUCH_INTERACTION_START 只报真实触摸;助手刚换步 1.2 秒内是它自己在动手,那段先不算)。
+        side.launch(Dispatchers.IO) {
+            // 先等这轮的屏定下来:不是主屏就直接收工,不在虚拟屏模式下留一个常驻轮询;
+            // 一直没建屏(纯对话任务)或任务已收尾也收工
+            var waited = 0
+            while (true) {
+                val d = p.display.current
+                if (d != null) {
+                    if (d.displayId != Display.DEFAULT_DISPLAY) return@launch
+                    break
+                }
+                if (_state.value is TaskState.Terminal || ++waited > 240) return@launch
+                delay(MAIN_WATCH_MS)
+            }
+            // 数主屏上的真实触摸(与接管计数同一条无障碍事件流)
+            val touches = java.util.concurrent.atomic.AtomicLong(0)
+            side.launch(Dispatchers.IO) {
+                runCatching {
+                    p.a11y.eventsFor(Display.DEFAULT_DISPLAY).collect { e ->
+                        // Mika 自己浮层上的触摸(点胶囊、按继续)不算介入:包名是 Mika 自己的就跳过
+                        if (e.eventType == android.view.accessibility.AccessibilityEvent.TYPE_TOUCH_INTERACTION_START &&
+                            e.packageName?.toString() != p.a11y.packageName
+                        ) touches.incrementAndGet()
+                    }
+                }
+            }
+            var streak = 0
+            var lastTouches = touches.get()
+            var lastStep = -1
+            var lastStepAt = 0L
+            while (true) {
+                delay(MAIN_WATCH_MS)
+                if (p.display.current?.displayId != Display.DEFAULT_DISPLAY || handoverRef?.handedOver == true) { streak = 0; continue }
+                val running = _state.value as? TaskState.Running
+                if (running != null && running.step != lastStep) {
+                    lastStep = running.step
+                    lastStepAt = SystemClock.elapsedRealtime()
+                }
+                val nowTouches = touches.get()
+                val userTouched = nowTouches != lastTouches && running != null && running.tool == null &&
+                    SystemClock.elapsedRealtime() - lastStepAt >= TOUCH_QUIET_MS
+                lastTouches = nowTouches
+                val target = p.screen.target.value
+                var intervene = userTouched
+                if (!intervene) {
+                    if (target == null || target.taskId < 0) { streak = 0; continue }
+                    val top = runCatching { p.shell.topTaskId(Display.DEFAULT_DISPLAY) }.getOrDefault(-1)
+                    if (top < 0 || top == target.taskId) { streak = 0; continue }
+                    val pkg = runCatching { p.shell.packageOfTask(top) }.getOrNull()
+                    if (pkg == null || pkg in MAIN_SYSTEM_PKGS || pkg == target.packageName) { streak = 0; continue }
+                    intervene = ++streak >= 2
+                }
+                if (intervene) {
+                    streak = 0
+                    gate?.onTaskMovedAway()
+                    publish(_state.value)
+                    // 暂停后等目标回到最上面才重新武装,免得介入期间反复触发;
+                    // 目标被换掉或关掉时也跳出,回外层照新目标重新盯,不要卡死在等一个回不来的任务。
+                    // (在目标 App 里触摸介入的:目标本来就在最上面,这个等待直接通过。)
+                    if (target != null && target.taskId >= 0) {
+                        while (true) {
+                            delay(MAIN_WATCH_MS)
+                            val now = p.screen.target.value
+                            if (now == null || now.taskId != target.taskId) break
+                            if (runCatching { p.shell.topTaskId(Display.DEFAULT_DISPLAY) }.getOrDefault(-1) == target.taskId) break
+                            if (runCatching { p.shell.packageOfTask(target.taskId) }.getOrNull() == null) break
+                        }
                     }
                 }
             }
@@ -1357,6 +1453,18 @@ class TaskRun(
         const val DISPLAY_RETRY_MS = 1_000L
         /** Mika 屏上的前台 App 两次重读之间至少隔这么久。 */
         const val FOREGROUND_GAP_MS = 300L
+        /** 主屏模式盯前台的间隔;连续两次(约 1 秒)被别的 App 盖住才算有人介入。 */
+        const val MAIN_WATCH_MS = 500L
+        /** 助手刚换步这段时间内的主屏触摸先不算介入(多半是它自己的动作余波)。 */
+        const val TOUCH_QUIET_MS = 1_200L
+        /** 不算「有人介入」的系统前台包:权限框、系统界面、选择器这类盖一下就走的。 */
+        val MAIN_SYSTEM_PKGS = setOf(
+            "com.android.systemui",
+            "com.android.permissioncontroller",
+            "com.google.android.permissioncontroller",
+            "com.android.intentresolver",
+            "com.google.android.intentresolver",
+        )
         val WAITING_DISPLAY: String get() = tr(R.string.task_waiting_display)
         const val A11Y_WAIT_MS = 5_000L
         val NO_PHONE_HELPER: String get() = tr(R.string.task_no_phone_helper)

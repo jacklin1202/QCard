@@ -173,6 +173,9 @@
     <string name="settings_token_budget_custom">自定义 Token 预算</string>
     <string name="settings_token_budget_apply">使用</string>
     <string name="settings_token_budget_invalid">请输入 %1$s 到 %2$s 的整数。</string>
+    <string name="main_display_mode_title">主画面模式(雷电适配)</string>
+    <string name="main_display_mode_sub_on">已开:任务直接在主画面执行;有人操作主画面时自动暂停。</string>
+    <string name="main_display_mode_sub_off">已关:任务在虚拟屏幕执行(原版行为)。</string>
     <string name="release_display_title">释放背景屏幕</string>
     <string name="release_display_sub_on">背景屏幕目前保留中。释放后，开在上面的 App 会跟着关闭。</string>
     <string name="release_display_sub_off">目前没有保留中的背景屏幕。</string>

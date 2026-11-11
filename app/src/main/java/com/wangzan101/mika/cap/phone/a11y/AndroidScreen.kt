@@ -1639,7 +1639,8 @@ class AndroidScreen(
 
     /** 动作之前:请内置助手盯着主屏,记下此刻两块屏最上面的任务;没有屏、接管中或助手不支持时为 null(不盯)。 */
     private fun armSpillWatch(): Watch? {
-        if (!hasDisplay || handedOver()) return null
+        // 主屏模式(ldplayer-adapt):App 本来就该开在主屏上,没有「冒到主屏」这回事,不盯梢、也不挪回
+        if (!hasDisplay || handedOver() || displayId == Display.DEFAULT_DISPLAY) return null
         val since = SystemClock.uptimeMillis()
         watchUserTaps(since + SPILL_WINDOW_MS)
         val top = runCatching { shell.watchMainScreen(SPILL_WINDOW_MS.toInt()) }.getOrNull() ?: return null

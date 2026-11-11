@@ -536,9 +536,27 @@ fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}) {
             ) { RowChevron() }
         }
         GroupCard {
-            ReleaseDisplayRow(first = true)
+            MainDisplayModeRow(first = true)
+            ReleaseDisplayRow(first = false)
         }
     }
+}
+
+/**
+ * 主屏模式开关(ldplayer-adapt 分支):打开后任务直接在主屏上做,不建虚拟屏;
+ * 有人操作主屏时任务自动暂停。开关本体见 [com.wangzan101.mika.settings.MainDisplayMode]。
+ */
+@Composable
+private fun MainDisplayModeRow(first: Boolean) {
+    val context = LocalContext.current
+    val mode = remember { com.wangzan101.mika.cap.phone.PhoneServices.of(context).mainDisplayMode }
+    val on by mode.enabled.collectAsState()
+    ListRow(
+        MikaIcons.Screens, stringResource(R.string.main_display_mode_title),
+        stringResource(if (on) R.string.main_display_mode_sub_on else R.string.main_display_mode_sub_off),
+        first = first,
+        trailing = { MikaSwitch(on, { mode.set(it) }) },
+    )
 }
 
 /**

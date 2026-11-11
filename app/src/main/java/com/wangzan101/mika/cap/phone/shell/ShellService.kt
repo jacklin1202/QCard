@@ -164,6 +164,12 @@ class ShellService(
     /** 只往这个服务自己建的虚拟屏上启动,调用方传错屏号(比如主屏)也不会打扰用户。 */
     private fun ownDisplay(displayId: Int): Boolean = synchronized(displays) { displayId in displays }
 
+    /**
+     * 主屏模式(ldplayer-adapt 分支)的任务用屏判定:主屏也算「能往上送东西」的屏(启动、输入、读顶层任务);
+     * 建屏、放屏、任务收尾仍只认自有虚拟屏,不用这个。
+     */
+    private fun servedDisplay(displayId: Int): Boolean = displayId == Display.DEFAULT_DISPLAY || ownDisplay(displayId)
+
     override fun releaseDisplay(displayId: Int) {
         awake.stop(displayId)
         // 锁里只摘下来,关监听(binder)和放屏在锁外做
@@ -247,9 +253,10 @@ class ShellService(
      * 再以那份用户启动,接口不可用时退回 `am start --user`。
      */
     private fun start(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
-        if (!ownDisplay(displayId)) return START_ERROR
+        if (!servedDisplay(displayId)) return START_ERROR
         try {
-            if (inUseOnMainScreen(packageName, userId)) return START_IN_USE_ON_MAIN
+            // 目标就是主屏时:它在主屏上不是占用,是本来就在地方
+            if (displayId != Display.DEFAULT_DISPLAY && inUseOnMainScreen(packageName, userId)) return START_IN_USE_ON_MAIN
             if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
         } catch (t: Throwable) {
             // 看不清主屏状态时宁可不启动,也不冒险打扰用户
@@ -352,8 +359,8 @@ class ShellService(
 
     /** [restartApp] 作用在 [userId] 那份用户里的那份:只看这一份的任务、只结束这份用户里的进程,装在别的用户里的另一份不动。 */
     private fun restart(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
-        // 不是自己建的屏(含主屏)一律不动,更不能先结束进程
-        if (!ownDisplay(displayId)) return START_ERROR
+        // 不是任务用屏一律不动,更不能先结束进程;主屏模式下主屏就是任务用屏(ldplayer-adapt)
+        if (!servedDisplay(displayId)) return START_ERROR
         val decision = try {
             // 别的任务正在 Mika 另一块屏上用它:绝不结束它的进程
             if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
@@ -361,7 +368,8 @@ class ShellService(
             dropKept(packageName, userId)
             val displayField = TASK_INFO.getField("displayId")
             val taskDisplays = allTasks().filter { isCopy(it, packageName, userId) }.map { displayField.getInt(it) }
-            ColdStart.decide(taskDisplays, displayId, inUseOnMainScreen(packageName, userId))
+            // 主屏模式下目标就是主屏:它在主屏上是 Mika 自己的任务,不算「用户正在主屏用它」(与 start() 的跳过一致)
+            ColdStart.decide(taskDisplays, displayId, displayId != Display.DEFAULT_DISPLAY && inUseOnMainScreen(packageName, userId))
         } catch (t: Throwable) {
             Log.e(TAG, "cannot inspect tasks", t)
             return START_ERROR
@@ -371,9 +379,14 @@ class ShellService(
             ColdStart.IN_USE -> START_IN_USE_ON_MAIN
             ColdStart.WARM -> start(displayId, packageName, userId).let { if (it == START_OK) START_OK_COLD_IGNORED else it }
             ColdStart.RESTART -> {
-                val user = if (userId == myUser) "current" else "$userId"
-                if (exec("am", "force-stop", "--user", user, packageName) != 0) return START_ERROR
-                start(displayId, packageName, userId)
+                if (displayId == Display.DEFAULT_DISPLAY) {
+                    // 主屏模式:主屏和使用者共用,他可能正在这个 App 里,不结束进程,退回普通启动
+                    start(displayId, packageName, userId).let { if (it == START_OK) START_OK_COLD_IGNORED else it }
+                } else {
+                    val user = if (userId == myUser) "current" else "$userId"
+                    if (exec("am", "force-stop", "--user", user, packageName) != 0) return START_ERROR
+                    start(displayId, packageName, userId)
+                }
             }
         }
     }
@@ -381,7 +394,7 @@ class ShellService(
     /** 在另一份用户里打开:只认 [appCopyUsers] 判为能用的那几份(私密空间、别人的用户一律不碰),规则见 [AppCopies]。 */
     override fun startAppInUser(displayId: Int, packageName: String, userId: Int, cold: Boolean): Int {
         if (userId == myUser) return if (cold) restartApp(displayId, packageName) else startApp(displayId, packageName)
-        if (!ownDisplay(displayId)) return START_ERROR
+        if (!servedDisplay(displayId)) return START_ERROR
         val usable = try {
             users()?.let { AppCopies.usable(myUser, it) }
         } catch (t: Throwable) {
@@ -457,7 +470,7 @@ class ShellService(
      * 只有一个 App 能打开时直接指定到那个页面,免得系统另选。
      */
     override fun startView(displayId: Int, action: String?, uri: String?, packageName: String?): Int = synchronized(launchLock) {
-        if (!ownDisplay(displayId)) return START_ERROR
+        if (!servedDisplay(displayId)) return START_ERROR
         ShellLinks.refuse(action, uri, packageName)?.let { return it }
         val intent = Intent(action ?: Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         uri?.let { intent.data = Uri.parse(it) }
@@ -467,8 +480,11 @@ class ShellService(
         val candidates = activitiesFor(intent, null) ?: return START_ERROR
         if (candidates.isEmpty()) return START_UNRESOLVED
         try {
-            val onMain = tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet()
-            if (ShellLinks.inUse(candidates.map { it.first }.distinct(), onMain)) return START_IN_USE_ON_MAIN
+            // 目标就是主屏时不查主屏占用(在主屏上的是本任务的 App),也免得查询失败误挡启动
+            if (displayId != Display.DEFAULT_DISPLAY) {
+                val onMain = tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet()
+                if (ShellLinks.inUse(candidates.map { it.first }.distinct(), onMain)) return START_IN_USE_ON_MAIN
+            }
             if (onOtherOwnDisplay(candidates.map { it.first }.distinct(), displayId)) return START_IN_USE_BY_OTHER
         } catch (t: Throwable) {
             Log.e(TAG, "cannot inspect main-screen tasks", t)
@@ -499,12 +515,12 @@ class ShellService(
      * 和 [startApp] 一样,用户在主屏用着它时不启动。只有一个收分享的页面时直接指定,有几个时由系统问用哪一个。
      */
     override fun startShare(displayId: Int, packageName: String, text: String): Int = synchronized(launchLock) {
-        if (!ownDisplay(displayId)) return START_ERROR
+        if (!servedDisplay(displayId)) return START_ERROR
         val intent = ShareIntent.of(packageName, text)
         val candidates = activitiesFor(intent, ShareIntent.TYPE) ?: return START_ERROR
         if (candidates.isEmpty()) return START_UNRESOLVED
         try {
-            if (inUseOnMainScreen(packageName)) return START_IN_USE_ON_MAIN
+            if (displayId != Display.DEFAULT_DISPLAY && inUseOnMainScreen(packageName)) return START_IN_USE_ON_MAIN
             if (onOtherOwnDisplay(listOf(packageName), displayId)) return START_IN_USE_BY_OTHER
         } catch (t: Throwable) {
             Log.e(TAG, "cannot inspect main-screen tasks", t)
@@ -533,7 +549,7 @@ class ShellService(
      * [asMika]:以 Mika 的身份启动(权限按 Mika 查),屏和后台启动按发出的这一方(shell)查,仍落在这块屏上。
      */
     override fun startSystemAction(displayId: Int, intent: Intent, asMika: android.app.PendingIntent?): Int = synchronized(launchLock) {
-        if (!ownDisplay(displayId)) return START_ERROR
+        if (!servedDisplay(displayId)) return START_ERROR
         // Mika 自己的兼容性自检页:以 shell 身份直接开到这块屏
         if (intent.component?.className == SystemIntents.OWN_PAGE_CLASS) return startOwnPage(displayId, intent)
         if (!SystemIntents.allowed(intent.action, intent.dataString)) return START_INVALID_LINK
@@ -541,8 +557,11 @@ class ShellService(
         val candidates = activitiesFor(intent, intent.type) ?: return START_ERROR
         if (candidates.isEmpty()) return START_UNRESOLVED
         try {
-            val onMain = tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet()
-            if (ShellLinks.inUse(candidates.map { it.first }.distinct(), onMain)) return START_IN_USE_ON_MAIN
+            // 目标就是主屏时不查主屏占用(在主屏上的是本任务的 App),也免得查询失败误挡启动
+            if (displayId != Display.DEFAULT_DISPLAY) {
+                val onMain = tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet()
+                if (ShellLinks.inUse(candidates.map { it.first }.distinct(), onMain)) return START_IN_USE_ON_MAIN
+            }
             if (onOtherOwnDisplay(candidates.map { it.first }.distinct(), displayId)) return START_IN_USE_BY_OTHER
         } catch (t: Throwable) {
             Log.e(TAG, "cannot inspect main-screen tasks", t)
@@ -704,7 +723,7 @@ class ShellService(
     }
 
     override fun topActivity(displayId: Int): String? = try {
-        if (!ownDisplay(displayId)) null else tasksOn(displayId).firstOrNull()?.let {
+        if (!servedDisplay(displayId)) null else tasksOn(displayId).firstOrNull()?.let {
             (TASK_INFO.getField("topActivity").get(it) as? ComponentName)?.className
         }
     } catch (t: Throwable) {
@@ -1098,7 +1117,7 @@ class ShellService(
 
     /** 自有虚拟屏上的 Ctrl+A / Ctrl+V,同时发送修饰键按下和抬起;松开修饰键失败不会把已经发出的正文判成未发送。 */
     override fun injectCtrlKey(displayId: Int, keyCode: Int): Int {
-        if (!ownDisplay(displayId)) return AsciiTextKeys.NOT_SENT
+        if (!servedDisplay(displayId)) return AsciiTextKeys.NOT_SENT
         if (keyCode != KeyEvent.KEYCODE_A && keyCode != KeyEvent.KEYCODE_V) {
             Log.w(TAG, "refused ctrl key $keyCode")
             return AsciiTextKeys.NOT_SENT
@@ -1119,7 +1138,7 @@ class ShellService(
         } finally {
             if (modifierDown) {
                 val up = event(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_UP, 0)
-                if (ownDisplay(displayId) && !inject(up, displayId) && !inject(up, displayId)) {
+                if (servedDisplay(displayId) && !inject(up, displayId) && !inject(up, displayId)) {
                     Log.w(TAG, "could not release Ctrl on display $displayId")
                 }
             }
@@ -1128,7 +1147,7 @@ class ShellService(
 
     @SuppressLint("DiscouragedPrivateApi")
     override fun injectAsciiText(displayId: Int, taskId: Int, packageName: String, text: String): Int {
-        if (displayId <= Display.DEFAULT_DISPLAY || !ownDisplay(displayId) || taskId < 0 || !AsciiTextKeys.supports(text)) {
+        if (displayId < Display.DEFAULT_DISPLAY || !servedDisplay(displayId) || taskId < 0 || !AsciiTextKeys.supports(text)) {
             return AsciiTextKeys.NOT_SENT
         }
         val (events, targetUid) = runCatching {
@@ -1149,7 +1168,7 @@ class ShellService(
         }.getOrElse { return AsciiTextKeys.NOT_SENT }
 
         for (event in events) {
-            if (!ownDisplay(displayId) || (targetUid == null && topTaskId(displayId) != taskId)) {
+            if (!servedDisplay(displayId) || (targetUid == null && topTaskId(displayId) != taskId)) {
                 return AsciiTextKeys.UNCONFIRMED
             }
             event.source = InputDevice.SOURCE_KEYBOARD
@@ -1193,7 +1212,7 @@ class ShellService(
      * 按下之后中途哪个点没注入成功也照样往下走,最后一定补发抬起,不让手指一直按着。
      */
     override fun injectStroke(displayId: Int, xs: IntArray, ys: IntArray, times: LongArray): Boolean {
-        if (!ownDisplay(displayId)) return false
+        if (!servedDisplay(displayId)) return false
         val n = times.size
         if (n < 2 || n > STROKE_MAX_POINTS || xs.size != n || ys.size != n || times[0] != 0L ||
             times.last() > STROKE_MAX_MS || (1 until n).any { times[it] < times[it - 1] }
@@ -1443,7 +1462,7 @@ class ShellService(
     override fun identity(): IntArray = intArrayOf(Process.myUid(), Process.myPid())
 
     override fun runSystemCommand(displayId: Int, command: String): Bundle {
-        if (!ownDisplay(displayId)) return commandResult(-1, "No task display is active.")
+        if (!servedDisplay(displayId)) return commandResult(-1, "No task display is active.")
         return exec(command, displayId)
     }
 
