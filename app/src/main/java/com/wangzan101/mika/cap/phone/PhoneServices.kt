@@ -37,6 +37,13 @@ class PhoneServices(context: Context) {
     /** 任务与启动恢复共用的那条 shell 连接。 */
     val sharedShell = SharedShell { BuiltinShellConnection(hub) { shellManager.need() } }
 
+    /** 常驻虚拟屏(ldplayer-adapt 分支):跨任务保留 Agent 屏,见 [com.wangzan101.mika.cap.phone.display.AgentDisplayStore]。 */
+    val displayStore = com.wangzan101.mika.cap.phone.display.AgentDisplayStore(
+        holdBinding = { sharedShell.acquire() },
+        dropBinding = { sharedShell.release() },
+        closeDisplay = com.wangzan101.mika.cap.phone.display.AgentDisplay::release,
+    )
+
     /** 一次配对的全过程。 */
     val pairing: PairingCoordinator by lazy { PairingCoordinator(app, shellControl) }
 

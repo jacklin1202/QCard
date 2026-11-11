@@ -503,6 +503,8 @@ class TaskRun(
         var mute: AudioMute? = null
         // 模型标下的任务结束时各 App 的去留(在手机端口上);收尾时交给内置助手
         var afterTask: com.wangzan101.mika.core.uistate.AfterTaskMarks? = null
+        // 本分支(ldplayer-adapt):这轮用的是常驻屏时,收尾不放屏、不分流 App(见 AgentDisplayStore)
+        var phoneDisplayShared = false
         var shellDeath: IBinder.DeathRecipient? = null
         var shellBinder: IBinder? = null
         val traces = (service.application as MikaApp).detailedTraces
@@ -596,7 +598,15 @@ class TaskRun(
                 shellBinder = shell.asBinder()
                 side.launch { conn.shell.map { it != null }.collect { shellUp.value = it } }
                 val agentDisplay = LazyAgentDisplay(metrics.widthPixels, metrics.heightPixels) {
-                    suspend fun create() = resources.acquire(Dispatchers.IO, AgentDisplay::release) { AgentDisplay(shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, service.getSystemService(DisplayManager::class.java)) }
+                    suspend fun buildDisplay() = AgentDisplay(shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, service.getSystemService(DisplayManager::class.java))
+                    // 先问常驻屏仓库:有空闲的常驻屏就沿用(不登记进本轮 resources,收尾不放);
+                    // 被别的任务占着才走上游老路,自建一块、收尾照放。
+                    suspend fun create(): AgentDisplay = when (val got = phoneServices.displayStore.obtain(key, shell.asBinder()) {
+                        withContext(Dispatchers.IO) { buildDisplay() }
+                    }) {
+                        is com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Shared -> { phoneDisplayShared = true; got.display }
+                        com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Obtain.Busy -> resources.acquire(Dispatchers.IO, AgentDisplay::release) { buildDisplay() }
+                    }
                     try {
                         create()
                     } catch (e: Exception) {
@@ -1035,7 +1045,7 @@ class TaskRun(
                 // 前面哪步抛错,屏和网页显示也照放(按建的反序)
                 try {
                     // 先定 Mika 屏上 App 的去留(留下的挪到主屏后面、正在出声的关掉)并释放屏,再还原静音:留下的不会突然出声
-                    val apps = phone?.takeIf { !shellDied }?.let { p ->
+                    val apps = if (phoneDisplayShared) null else phone?.takeIf { !shellDied }?.let { p ->
                         p.display.current?.let { d -> AppsAfterTaskEnd.finish(p.shell, d.displayId, afterTask) }
                     }
                     record?.let { r ->
@@ -1056,6 +1066,9 @@ class TaskRun(
             _displayId.value = -1
             _appShown.value = false
             if (connection != null) phoneServices.sharedShell.release()
+            // 常驻屏:解除本轮占用,屏本身留着给下一轮(助手死了只清自己那一代的屏)。
+            // binder 用 connectPhone 时存下的 shellBinder:这里 phone 已经清成 null,从它取永远是空的。
+            if (phoneDisplayShared) withContext(NonCancellable) { runCatching { phoneServices.displayStore.finishUse(key, shellBinder, shellDied) } }
         }
     }
 

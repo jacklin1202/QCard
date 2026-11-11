@@ -173,4 +173,9 @@
     <string name="settings_token_budget_custom">自訂 Token 預算</string>
     <string name="settings_token_budget_apply">使用</string>
     <string name="settings_token_budget_invalid">請輸入 %1$s 到 %2$s 的整數。</string>
+    <string name="release_display_title">釋放背景螢幕</string>
+    <string name="release_display_sub_on">背景螢幕目前保留中。釋放後，開在上面的 App 會跟著關閉。</string>
+    <string name="release_display_sub_off">目前沒有保留中的背景螢幕。</string>
+    <string name="release_display_busy">有任務正在使用這塊螢幕，等任務結束後再釋放。</string>
+    <string name="release_display_done">已釋放背景螢幕。</string>
 </resources>

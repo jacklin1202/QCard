@@ -19,7 +19,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.wangzan101.mika.i18n.AppLanguage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -532,7 +535,49 @@ fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}) {
                 onClick = onOpenSelfCheck,
             ) { RowChevron() }
         }
+        GroupCard {
+            ReleaseDisplayRow(first = true)
+        }
     }
+}
+
+/**
+ * 手动释放常驻的背景虚拟屏(ldplayer-adapt 分支):屏上有 App 时写明会跟着关;
+ * 有任务正用着会被拒绝,点了之后把结果写在副标题上。
+ */
+@Composable
+private fun ReleaseDisplayRow(first: Boolean) {
+    val context = LocalContext.current
+    val store = remember { com.wangzan101.mika.cap.phone.PhoneServices.of(context).displayStore }
+    val scope = rememberCoroutineScope()
+    var note by remember { mutableStateOf<String?>(null) }
+    var noteSnap by remember { mutableStateOf<com.wangzan101.mika.cap.phone.display.AgentDisplayStore.Snapshot?>(null) }
+    val snap by store.state.collectAsState()
+    // 操作回显只管当下:状态被「别处」改掉(新任务建屏/别处释放)时作废;
+    // 本行自己操作造成的那次变化不清,免得「已释放」刚写上就被自己的状态更新洗掉
+    LaunchedEffect(snap) { if (note != null && noteSnap != snap) note = null }
+    val doneText = stringResource(R.string.release_display_done)
+    val busyText = stringResource(R.string.release_display_busy)
+    val subtitle = note ?: stringResource(
+        when {
+            snap.hasDisplay && snap.inUse -> R.string.release_display_busy
+            snap.hasDisplay -> R.string.release_display_sub_on
+            else -> R.string.release_display_sub_off
+        },
+    )
+    ListRow(
+        MikaIcons.Screens, stringResource(R.string.release_display_title), subtitle, first = first,
+        onClick = {
+            scope.launch {
+                note = when {
+                    !snap.hasDisplay -> null
+                    store.releaseNow() -> doneText
+                    else -> busyText
+                }
+                noteSnap = store.state.value
+            }
+        },
+    ) { RowChevron() }
 }
 
 /** 外观的当前说法(设置页和这一行都用)。 */

@@ -188,4 +188,9 @@
     <string name="settings_token_budget_custom">Custom token budget</string>
     <string name="settings_token_budget_apply">Use</string>
     <string name="settings_token_budget_invalid">Enter a whole number from %1$s to %2$s.</string>
+    <string name="release_display_title">Release background screen</string>
+    <string name="release_display_sub_on">The background screen is being kept. Releasing it closes the apps open on it.</string>
+    <string name="release_display_sub_off">No background screen is being kept right now.</string>
+    <string name="release_display_busy">A task is using the screen. Release it after the task finishes.</string>
+    <string name="release_display_done">Background screen released.</string>
 </resources>
