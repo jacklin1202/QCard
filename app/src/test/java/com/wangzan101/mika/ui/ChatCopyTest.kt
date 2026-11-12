@@ -15,12 +15,12 @@ import java.time.ZoneId
 class ChatCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    @Test fun fourDistinctNonBlankExamplesStartWithGithubStar() {
+    @Test fun threeDistinctNonBlankExamplesStartWithXSummary() {
         val examples = ChatCopy.examples
-        assertEquals(4, examples.size)
-        assertEquals(4, examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
+        assertEquals(3, examples.size)
+        assertEquals(3, examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
         assertEquals(ChatCopy.ExampleKind.Web, examples.first().kind)
-        assertTrue(examples.first().text.contains("https://github.com/wangzan101/mika"))
+        assertTrue(examples.first().text.contains("X.com"))
         assertEquals(ChatCopy.examples.map { it.text }, ChatCopy.recommendationSeeds().map { it.first })
         assertEquals(ChatCopy.examples.map { it.text }, ChatCopy.recommendationSeeds().map { it.second })
     }
