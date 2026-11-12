@@ -164,6 +164,9 @@ data class Provider(
 /** OkHttp 把超时换算为 Int 毫秒，秒数必须在换算后仍能存下。 */
 internal val MODEL_READ_TIMEOUT_SECONDS = 1..(Int.MAX_VALUE / 1_000)
 
+/** 主模型备援链最长几位(项目 3)。 */
+internal const val MAX_MAIN_FALLBACKS = 2
+
 /** 留空的窗口沿用所选模型配置，留空的触发点交给核心自动计算，留空的读超时用全局默认(120 秒)。 */
 data class ModelContextSettings(val windowTokens: Int? = null, val triggerTokens: Int? = null, val readTimeoutSeconds: Int? = null) {
     fun limits(modelWindow: Int): ContextLimits = ContextLimits.of(windowTokens ?: modelWindow, triggerTokens)
@@ -189,6 +192,8 @@ data class RoleChoices(
     val main: String? = null,
     val vision: RoleChoice = RoleChoice.Off,
     val light: RoleChoice = RoleChoice.SameAsMain,
+    /** 主模型的备援配置 id(项目 3),按接手顺序;主模型失败时换不换由 Failover 的决策表定。 */
+    val mainFallbacks: List<String> = emptyList(),
     /** 按用途保存,同一个模型可在不同用途选不同档位;「用主模型」连同它的档位一起跟随。 */
     val reasoningEfforts: Map<ModelRole, String> = emptyMap(),
 ) {
@@ -213,7 +218,7 @@ data class RoleChoices(
     }
 
     /** 有用途在用的配置 id;其余的配置没人用,会被删掉。 */
-    val referenced: Set<String> get() = ModelRole.entries.mapNotNull(::resolve).toSet()
+    val referenced: Set<String> get() = ModelRole.entries.mapNotNull(::resolve).toSet() + mainFallbacks
 
     /** 改一个用途;这个用途不接受的选择(主模型只能是具体模型,轻量不能不用)返回 null。 */
     fun with(role: ModelRole, choice: RoleChoice): RoleChoices? = (when (role) {
@@ -237,6 +242,7 @@ data class RoleChoices(
             main = main?.takeIf { it in valid },
             vision = if (vision.gone()) RoleChoice.Off else vision,
             light = if (light.gone()) RoleChoice.SameAsMain else light,
+            mainFallbacks = mainFallbacks.filter { it in valid },
             reasoningEfforts = reasoningEfforts.filterKeys { role -> (get(role) as? RoleChoice.Model)?.configId in valid },
         )
     }
@@ -510,6 +516,55 @@ class ProviderStore(
         return true
     }
 
+    /**
+     * 把服务商 [providerId] 下的 [model] 备成一条配置(没有就按 [caps] 建;工具调用标记记为 true,它要能当主模型用),
+     * 返回配置 id;不派给任何用途。服务商不存在返回 null。
+     */
+    @Synchronized
+    fun ensureConfigId(providerId: String, model: String, caps: Capabilities): String? {
+        val p = provider(providerId) ?: return null
+        val existing = _configs.value.firstOrNull { it.providerId == p.id && it.model == model }
+        if (existing != null) {
+            if (!existing.capabilities.toolCalls) {
+                _configs.value = _configs.value.map { c ->
+                    if (c.id == existing.id) c.copy(capabilities = c.capabilities.copy(toolCalls = true)) else c
+                }
+                writeConfig()
+            }
+            return existing.id
+        }
+        val id = newId()
+        save(ProviderConfig(id, p.kind, p.baseUrl, model, caps.copy(toolCalls = true), p.name, p.id), null)
+        return id
+    }
+
+    /**
+     * 改主模型备援链的第 [slot] 位(项目 3):[configId] 为 null 是撤掉这一位(后面的往前补);
+     * 已在链里的配置是移动到目标位(不重复占位);新配置在目标位有空位时替换、链未满时接在末尾
+     * (中间有空槽也照接,不留空位)。链最长 [MAX_MAIN_FALLBACKS]。
+     */
+    @Synchronized
+    fun setMainFallback(slot: Int, configId: String?): Boolean {
+        if (slot < 0 || slot > MAX_MAIN_FALLBACKS) return false
+        if (configId != null && _configs.value.none { it.id == configId }) return false
+        val current = _roles.value.mainFallbacks
+        val next = when {
+            configId == null -> if (slot in current.indices) current.toMutableList().apply { removeAt(slot) } else return true
+            configId in current -> {
+                val rest = current.filter { it != configId }
+                rest.toMutableList().apply { add(minOf(slot, rest.size), configId) }
+            }
+            slot in current.indices -> current.toMutableList().apply { this[slot] = configId }
+            current.size < MAX_MAIN_FALLBACKS -> current + configId
+            else -> return false
+        }
+        if (next == current) return true
+        _roles.value = _roles.value.copy(mainFallbacks = next)
+        prune()
+        writeConfig()
+        return true
+    }
+
     /** 只改这个用途;不支持的协议、跟随主模型的用途或列表明确不支持的档位不接受。 */
     @Synchronized
     fun setReasoningEffort(role: ModelRole, effort: String?): Boolean {
@@ -613,6 +668,57 @@ class ProviderStore(
             thinkingTypes = listed?.thinkingTypes, readTimeoutSeconds = settings?.readTimeoutSeconds,
         )).metered(source, usage, ::checkDailyBudget)
     }
+
+    /** [configId] 这条配置本身(不按用途推看图标记);不存在为 null。 */
+    fun configById(configId: String): ProviderConfig? = _configs.value.firstOrNull { it.id == configId }
+
+    /** 这条配置当主模型用时的样子:看图标记按主模型的规矩推(和 [configFor] 对主模型的推法一致)。 */
+    private fun asMain(cfg: ProviderConfig): ProviderConfig {
+        val sees = ModelOptions.seesImages(cfg.capabilities.vision,
+            provider(cfg.providerId)?.visionOverrides?.get(cfg.model), usedForVision = _roles.value.resolve(ModelRole.Vision) == cfg.id)
+        return if (sees == cfg.capabilities.vision) cfg else cfg.copy(capabilities = cfg.capabilities.copy(vision = sees))
+    }
+
+    /**
+     * 按配置 id 建一个当主模型用的模型(备援链用,见 [RoleChoices.mainFallbacks]):计量、每日预算检查都和主模型同一条路,
+     * 用量记在主模型名下。配置不存在为 null。
+     */
+    fun modelForConfig(configId: String, session: ModelSession = ModelSession.fresh()): ChatModel? {
+        val raw = configById(configId) ?: return null
+        val p = provider(raw.providerId)
+        val source = UsageSource(raw.providerId, p?.name ?: raw.name, raw.model, UsagePurpose.of(ModelRole.Main))
+        val listed = listedOf(raw)
+        val settings = p?.contextSettings?.get(raw.model)
+        val adjusted = asMain(raw)
+        val configured = if (settings == null) adjusted else adjusted.copy(capabilities = adjusted.capabilities.copy(
+            contextTokens = settings.windowTokens ?: adjusted.capabilities.contextTokens,
+            compactionTriggerTokens = settings.triggerTokens,
+        ))
+        return modelFactory(configured, apiKey(raw.id), listed?.endpoint, ClientSetup(
+            headers(p?.sessionHeader, session), thinkingTypes = listed?.thinkingTypes,
+            readTimeoutSeconds = settings?.readTimeoutSeconds,
+        )).metered(source, usage, ::checkDailyBudget)
+    }
+
+    /**
+     * 主模型备援链(项目 3):按 [RoleChoices.mainFallbacks] 的顺序建出备援模型,和各自的服务商名平行返回,
+     * 供主模型链切换时判断每日预算跨不跨服务商(名字和 [ModelError.DailyBudgetExceeded] 里的同源)。
+     * 配置没了、建不出的位子跳过,链短一点照样能跑。
+     */
+    fun mainFallbackChain(session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> {
+        val models = ArrayList<ChatModel>()
+        val tags = ArrayList<String?>()
+        for (id in _roles.value.mainFallbacks) {
+            val cfg = configById(id) ?: continue
+            val m = modelForConfig(id, session) ?: continue
+            models += m
+            tags += provider(cfg.providerId)?.name ?: cfg.name
+        }
+        return models to tags
+    }
+
+    /** 主模型那一位的服务商名(主模型链标签的第一位)。 */
+    fun mainProviderTag(): String? = configFor(ModelRole.Main)?.let { cfg -> provider(cfg.providerId)?.name ?: cfg.name }
 
     /** 每次实际请求前重查配置和账本；达到预算时不发请求，也不记一笔虚假调用。 */
     private fun checkDailyBudget(source: UsageSource) {
@@ -1065,6 +1171,10 @@ class ProviderStore(
         }
         var r = RoleChoices()
         ModelRole.entries.forEach { role -> choice(role)?.let { c -> r.with(role, c)?.let { r = it } } }
+        r = r.copy(mainFallbacks = runCatching {
+            o["MainFallbacks"]?.jsonArray?.mapNotNull { el -> runCatching { el.jsonPrimitive.content }.getOrNull() }
+                ?.distinct()?.take(MAX_MAIN_FALLBACKS)
+        }.getOrNull().orEmpty())
         return r.copy(reasoningEfforts = ModelRole.entries.mapNotNull { role ->
             val effort = runCatching { o[role.name]?.jsonObject?.get("reasoningEffort")?.jsonPrimitive?.content }.getOrNull()
             if (r[role] is RoleChoice.Model && !effort.isNullOrBlank()) role to effort else null
@@ -1150,6 +1260,9 @@ class ProviderStore(
                         RoleChoice.Off -> putJsonObject(role.name) { put("use", USE_NONE) }
                         null -> Unit
                     }
+                }
+                if (_roles.value.mainFallbacks.isNotEmpty()) putJsonArray("MainFallbacks") {
+                    _roles.value.mainFallbacks.forEach { add(it) }
                 }
             }
         }

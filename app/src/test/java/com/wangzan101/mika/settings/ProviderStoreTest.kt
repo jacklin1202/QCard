@@ -62,6 +62,47 @@ class ProviderStoreTest {
         assertTrue(choose(ModelRole.Main, RoleChoice.Model(c.id)))
     }
 
+    // ---------- 主模型备援链(项目 3) ----------
+
+    @Test fun mainFallbackGapSlotAppendsAtEnd() {
+        val s = store()
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(1, "a"))
+        assertEquals(listOf("a"), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun mainFallbackAppendReplaceAndClear() {
+        val s = store()
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        assertEquals(listOf("a", "b"), s.roles.value.mainFallbacks)
+        s.save(cfg("c"), "sk-c")
+        assertTrue(s.setMainFallback(0, "c"))
+        assertEquals(listOf("c", "b"), s.roles.value.mainFallbacks)
+        assertTrue(s.setMainFallback(0, null))
+        assertEquals(listOf("b"), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun mainFallbackMoveDedupes() {
+        val s = store()
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        assertTrue(s.setMainFallback(0, "b"))
+        assertEquals(listOf("b", "a"), s.roles.value.mainFallbacks)
+        assertTrue(s.setMainFallback(1, "b"))
+        assertEquals(listOf("a", "b"), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun mainFallbackRejectsUnknownConfig() {
+        val s = store()
+        assertFalse(s.setMainFallback(0, "nope"))
+        assertEquals(emptyList<String>(), s.roles.value.mainFallbacks)
+    }
+
     private fun connected(s: ProviderStore, name: String = "P", key: String = "k") =
         s.connect(name, ProviderConfig.Kind.OpenAiCompat, "https://${name.lowercase()}.test/v1", key, listOf(ListedModel("m1"), ListedModel("m2")))
 

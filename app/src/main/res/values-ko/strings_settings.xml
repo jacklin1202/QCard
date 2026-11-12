@@ -173,4 +173,12 @@
     <string name="settings_token_budget_custom">사용자 지정 Token 예산</string>
     <string name="settings_token_budget_apply">사용</string>
     <string name="settings_token_budget_invalid">%1$s~%2$s 사이의 정수를 입력하세요.</string>
+    <string name="main_display_mode_title">Main-display mode (LDPlayer)</string>
+    <string name="main_display_mode_sub_on">On: tasks run on the main display. If someone uses the main display, the task pauses.</string>
+    <string name="main_display_mode_sub_off">Off: tasks run on the virtual display (upstream behavior).</string>
+    <string name="release_display_title">Release background screen</string>
+    <string name="release_display_sub_on">The background screen is being kept. Releasing it closes the apps open on it.</string>
+    <string name="release_display_sub_off">No background screen is being kept right now.</string>
+    <string name="release_display_done">Background screen released.</string>
+    <string name="release_display_busy">A task is using the screen. Release it after the task finishes.</string>
 </resources>
