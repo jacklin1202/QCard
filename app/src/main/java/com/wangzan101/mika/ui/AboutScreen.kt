@@ -71,7 +71,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /** 关于页上点开的底部面板。 */
-private enum class AboutSheet { Update, Changelog, Feedback, Group, Diagnostics }
+private enum class AboutSheet { Update, Changelog, Feedback, Diagnostics }
 
 /**
  * 关于 Mika:顶上图标、名字、一句话介绍、版本(Beta 标记、构建编号);下面是检查更新与更新记录、
@@ -111,9 +111,6 @@ fun AboutScreen(
             }
         }
     }
-    val saveQr = {
-        Toast.makeText(context, if (onSaveQr()) AboutCopy.QR_SAVED else AboutCopy.QR_SAVE_FAILED, Toast.LENGTH_SHORT).show()
-    }
     PageScaffold(AboutCopy.TITLE, onBack) {
         Hero(versionName, build, beta)
 
@@ -142,9 +139,7 @@ fun AboutScreen(
             ListRow(MikaIcons.Lines, AboutCopy.CHANGELOG, AboutCopy.CHANGELOG_SUB, onClick = { sheet = AboutSheet.Changelog }) { RowChevron() }
         }
         GroupCard {
-            ListRow(MikaIcons.Chats, AboutCopy.GROUP, AboutCopy.GROUP_SUB, first = true, onClick = { sheet = AboutSheet.Group }) { RowChevron() }
-            ListRow(MikaIcons.XMark, AboutCopy.FOLLOW, AboutCopy.FOLLOW_SUB, onClick = { onOpenUrl(MikaLinks.X) }) { ExternalMark() }
-            ListRow(MikaIcons.Bug, AboutCopy.FEEDBACK, AboutCopy.FEEDBACK_SUB, onClick = { sheet = AboutSheet.Feedback }) { RowChevron() }
+            ListRow(MikaIcons.Bug, AboutCopy.FEEDBACK, AboutCopy.FEEDBACK_SUB, first = true, onClick = { sheet = AboutSheet.Feedback }) { RowChevron() }
         }
         GroupCard {
             ListRow(MikaIcons.Code, AboutCopy.REPO, AboutCopy.REPO_SUB, first = true, onClick = { onOpenUrl(MikaLinks.REPO) }) { ExternalMark() }
@@ -186,7 +181,6 @@ fun AboutScreen(
             onDiagnostics = { sheet = AboutSheet.Diagnostics },
             onDismiss = close,
         )
-        AboutSheet.Group -> GroupSheet(onSave = saveQr, onDismiss = close)
         AboutSheet.Diagnostics -> DiagnosticsSheet(diagnostics, onDismiss = close)
         null -> Unit
     }
@@ -203,7 +197,7 @@ private fun Hero(versionName: String, build: String, beta: Boolean) {
             painterResource(R.drawable.qcard_launcher_art), contentDescription = null,
             Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)),
         )
-        Text("Mika", Modifier.padding(top = 12.dp), style = MikaType.Title, fontWeight = FontWeight.Bold, color = c.ink)
+        Text("Q卡", Modifier.padding(top = 12.dp), style = MikaType.Title, fontWeight = FontWeight.Bold, color = c.ink)
         Text(AboutCopy.TAGLINE, Modifier.padding(top = 4.dp), style = MikaType.Caption, color = c.ink2, textAlign = TextAlign.Center)
         Row(Modifier.padding(top = 10.dp).testTag("about-version"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(AboutCopy.version(versionName), style = MikaType.Hint, color = c.ink3)
@@ -324,24 +318,4 @@ private fun FeedbackOption(icon: ImageVector, title: String, sub: String, first:
     }
 }
 
-/**
- * 联系作者面板:作者的微信二维码,长按或按钮存进相册。二维码最高占屏幕约三分之一,常见手机上不用滚就能看到按钮。
- */
-@Composable
-internal fun GroupSheet(onSave: () -> Unit, onDismiss: () -> Unit) {
-    val c = MikaTheme.colors
-    val qrHeight = (LocalConfiguration.current.screenHeightDp * 0.34f).coerceAtMost(280f).dp
-    val qr = painterResource(QrImage.RES)
-    AboutSheetFrame(AboutCopy.GROUP_SHEET_TITLE, AboutCopy.GROUP_SHEET_SUB, "group-sheet", onDismiss) {
-        Image(
-            qr, contentDescription = AboutCopy.GROUP_SHEET_TITLE,
-            Modifier.padding(top = 12.dp, bottom = 6.dp).align(Alignment.CenterHorizontally)
-                .height(qrHeight).aspectRatio(qr.intrinsicSize.width / qr.intrinsicSize.height)
-                .clip(RoundedCornerShape(12.dp))
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { onSave() }) }
-                .testTag("wechat-qr"),
-        )
-        Text(AboutCopy.GROUP_HINT, Modifier.fillMaxWidth(), style = MikaType.Hint, color = c.ink3, textAlign = TextAlign.Center)
-        MikaButton(AboutCopy.SAVE_QR, onSave, Modifier.fillMaxWidth().padding(top = 14.dp), kind = ButtonKind.Tonal)
-    }
-}
+

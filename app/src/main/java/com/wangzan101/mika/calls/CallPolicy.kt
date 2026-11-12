@@ -124,14 +124,18 @@ internal object CallPolicy {
             ?: "default".takeIf { modes.isEmpty() && noOverride }
     }
 
-    private const val IDENTITY_GREETING = "您好，我是 Mika AI 电话助手。"
+    private const val IDENTITY_GREETING = "您好，我是 Q卡 AI 电话助手。"
     private const val LEGACY_IDENTITY_GREETING = "您好，我是 Mika 的 AI 电话助手。"
+    // 改名前的上一版预设(本 fork 到 2026-11 为止所有版本出厂的招呼语)。
+    private const val INTERIM_IDENTITY_GREETING = "您好，我是 Mika AI 电话助手。"
     private const val INCOMING_GREETING = "请问有什么需要我转告？"
     const val DEFAULT_GREETING = IDENTITY_GREETING + INCOMING_GREETING
     const val TASK_GREETING = IDENTITY_GREETING + "请问现在方便通话吗？"
 
     fun migrateDefaultGreeting(stored: String): String =
-        if (stored == LEGACY_IDENTITY_GREETING + INCOMING_GREETING) DEFAULT_GREETING else stored
+        if (stored == LEGACY_IDENTITY_GREETING + INCOMING_GREETING ||
+            stored == INTERIM_IDENTITY_GREETING + INCOMING_GREETING
+        ) DEFAULT_GREETING else stored
 
     fun spokenGreeting(configured: String, hasTask: Boolean): String {
         if (configured.isBlank()) return ""

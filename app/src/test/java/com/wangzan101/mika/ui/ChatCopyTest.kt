@@ -15,10 +15,10 @@ import java.time.ZoneId
 class ChatCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    @Test fun threeDistinctNonBlankExamplesStartWithXSummary() {
+    @Test fun twoDistinctNonBlankExamplesStartWithXSummary() {
         val examples = ChatCopy.examples
-        assertEquals(3, examples.size)
-        assertEquals(3, examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
+        assertEquals(2, examples.size)
+        assertEquals(2, examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
         assertEquals(ChatCopy.ExampleKind.Web, examples.first().kind)
         assertTrue(examples.first().text.contains("X.com"))
         assertTrue(examples.first().text.contains("Chrome"))
@@ -167,7 +167,7 @@ class ChatCopyTest {
     @Test fun placeholderFollowsTheComposer() {
         assertEquals(ChatCopy.EMPTY_PROMPT, ChatCopy.placeholder(ComposerMode.Idle, hasHistory = false))
         assertEquals("继续说点什么…", ChatCopy.placeholder(ComposerMode.Idle, hasHistory = true))
-        assertEquals("回答 Mika 的问题", ChatCopy.placeholder(ComposerMode.Answer, hasHistory = true))
+        assertEquals("回答 Q卡的问题", ChatCopy.placeholder(ComposerMode.Answer, hasHistory = true))
         assertEquals("补充或改要求…", ChatCopy.placeholder(ComposerMode.Busy, hasHistory = true))
         assertEquals("写下下一件事…", ChatCopy.placeholder(ComposerMode.Busy, hasHistory = true, followUp = FollowUpMode.Queue))
     }

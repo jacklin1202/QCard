@@ -28,7 +28,6 @@ object ChatCopy {
 
     val examples get() = listOf(
         Example(ExampleKind.Web, tr(R.string.chat_example_github_star)),
-        Example(ExampleKind.App, tr(R.string.chat_example_group_summary)),
         Example(ExampleKind.Device, tr(R.string.chat_example_alarms)),
     )
 

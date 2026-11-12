@@ -98,8 +98,9 @@ class StringResourcesTest {
     fun otherLanguagesHaveNoChineseLeftOver() {
         val cjk = Regex("[\\u4e00-\\u9fff]")
         for (o in others.filter { it.folder != "values-ja" }) {
-            val left = o.texts.strings.filter { (_, v) -> cjk.containsMatchIn(v) }.keys +
-                o.texts.plurals.filter { (_, forms) -> forms.values.any(cjk::containsMatchIn) }.keys
+            // 品牌名 Q卡本身就是中文(业主定名,所有语种一致);先把品牌词去掉再查残留。
+            val left = o.texts.strings.filter { (_, v) -> cjk.containsMatchIn(v.replace("Q卡", "")) }.keys +
+                o.texts.plurals.filter { (_, forms) -> forms.values.any { cjk.containsMatchIn(it.replace("Q卡", "")) } }.keys
             assertEquals(o.folder, emptySet<String>(), left)
         }
     }
@@ -120,8 +121,8 @@ class StringResourcesTest {
     @Test
     fun englishHasNoChineseLeftOver() {
         val cjk = Regex("[\\u4e00-\\u9fff]")
-        val left = en.strings.filter { (k, v) -> k !in fixed && cjk.containsMatchIn(v) }.keys +
-            en.plurals.filter { (_, forms) -> forms.values.any(cjk::containsMatchIn) }.keys
+        val left = en.strings.filter { (k, v) -> k !in fixed && cjk.containsMatchIn(v.replace("Q卡", "")) }.keys +
+            en.plurals.filter { (_, forms) -> forms.values.any { cjk.containsMatchIn(it.replace("Q卡", "")) } }.keys
         assertEquals(emptySet<String>(), left)
     }
 

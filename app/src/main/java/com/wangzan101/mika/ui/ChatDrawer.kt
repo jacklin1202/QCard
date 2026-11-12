@@ -293,7 +293,7 @@ fun ChatDrawer(
         ) {
             MikaLogo(36.dp, corner = 10.dp)
             Column(Modifier.weight(1f)) {
-                Text("Mika", style = MikaType.Title, color = c.ink)
+                Text("Q卡", style = MikaType.Title, color = c.ink)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Box(Modifier.size(6.dp).background(if (ok) c.ok else c.warnSolid, CircleShape))
                     Text(state, style = MikaType.Hint, fontWeight = FontWeight.Medium, color = c.ink3)
@@ -307,19 +307,6 @@ fun ChatDrawer(
             }
         }
         if (canSearch && !selecting) DrawerSearchField(query, onQueryChange)
-        // 搜索、多选时把几个入口收起来，把高度让给列表;退出后原样回来
-        if (!searchActive && !selecting) Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            NavEntry(MikaIcons.Message, stringResource(R.string.drawer_personal), onClick = onPersonal)
-            NavEntry(MikaIcons.New, stringResource(R.string.chat_new), enabled = canSwitch, onClick = onNew)
-            NavEntry(MikaIcons.Clock, stringResource(R.string.drawer_plans), onClick = onPlans)
-            NavEntry(MikaIcons.Heart, stringResource(R.string.memory_and_skills), onClick = onMemory)
-            NavEntry(MikaIcons.Globe, stringResource(R.string.drawer_browser), onClick = onBrowser)
-            NavEntry(MikaIcons.Paperclip, stringResource(R.string.file_library_title), onClick = onFiles)
-            // 和上面几项隔开一点:这是把 Mika 整个停下来,不是换一页
-            Box(Modifier.padding(top = 4.dp)) {
-                NavEntry(MikaIcons.Power, stringResource(R.string.quit_title), onClick = onQuit)
-            }
-        }
         // 侧栏关着时列表只剩末尾那一项;打开时对话插在它前面,列表会按原来那一项停在最底下。最上面一项变了就回到顶上
         val list = rememberLazyListState()
         val first = when {
@@ -352,6 +339,22 @@ fun ChatDrawer(
                     item("search-more") { SearchHint(stringResource(R.string.drawer_search_truncated, ConversationSearch.MAX_HITS)) }
                 }
             } else {
+                // 入口菜单并进同一个滚动列表:矮屏幕上不再把最近对话的空间挤到只剩一条缝
+                if (!selecting) {
+                    item("menu") {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                            NavEntry(MikaIcons.Message, stringResource(R.string.drawer_personal), onClick = onPersonal)
+                            NavEntry(MikaIcons.New, stringResource(R.string.chat_new), enabled = canSwitch, onClick = onNew)
+                            NavEntry(MikaIcons.Clock, stringResource(R.string.drawer_plans), onClick = onPlans)
+                            NavEntry(MikaIcons.Heart, stringResource(R.string.memory_and_skills), onClick = onMemory)
+                            NavEntry(MikaIcons.Globe, stringResource(R.string.drawer_browser), onClick = onBrowser)
+                            NavEntry(MikaIcons.Paperclip, stringResource(R.string.file_library_title), onClick = onFiles)
+                            Box(Modifier.padding(top = 4.dp)) {
+                                NavEntry(MikaIcons.Power, stringResource(R.string.quit_title), onClick = onQuit)
+                            }
+                        }
+                    }
+                }
                 if (sections.running.isNotEmpty()) {
                     // 「进行中」这一段的右边进「后台屏」页:看每个在跑的任务正在用哪个 App、实时画面
                     item("h-running") { RunningLabel(onScreens) }
