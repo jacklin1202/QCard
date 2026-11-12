@@ -15,11 +15,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.wangzan101.mika"
+        applicationId = "io.github.jacklin1202.qcard"
         minSdk = 30
         targetSdk = 35
-        versionCode = 41
-        versionName = "0.1.40"
+        versionCode = 1
+        versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
@@ -58,7 +58,7 @@ android {
         // 真机验收时并排安装,保留发行版和用户数据;默认构建标识不变。
         if (providers.gradleProperty("devInstall").isPresent) getByName("debug") {
             applicationIdSuffix = ".dev"
-            resValue("string", "app_name", "Mika Dev")
+            resValue("string", "app_name", "Q卡 Dev")
         }
         // 看流畅度用的包:和发布版一样不可调试(调试包不做预先编译,界面慢好几倍,手感不作数),
         // 用本机调试签名,能直接覆盖调试包、保留数据;可被性能工具采样。./gradlew :app:assemblePerf
@@ -75,7 +75,7 @@ android {
             versionNameSuffix = "-logs"
             isDebuggable = true
             isProfileable = false
-            resValue("string", "app_name", "Mika Logs")
+            resValue("string", "app_name", "Q卡 Logs")
             buildConfigField("boolean", "ADB_LOGS", "true")
             matchingFallbacks += "release"
         }

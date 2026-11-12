@@ -28,7 +28,6 @@ object ChatCopy {
 
     val examples get() = listOf(
         Example(ExampleKind.Web, tr(R.string.chat_example_github_star)),
-        Example(ExampleKind.App, tr(R.string.chat_example_follow)),
         Example(ExampleKind.App, tr(R.string.chat_example_group_summary)),
         Example(ExampleKind.Device, tr(R.string.chat_example_alarms)),
     )
@@ -36,7 +35,7 @@ object ChatCopy {
     fun recommendationSeeds(): List<Pair<String, String>> = examples.map { it.text to it.text }
 
     /** 对话页顶栏的标题:固定是 App 名;副标题说此刻在做什么。 */
-    const val APP_TITLE = "Mika"
+    const val APP_TITLE = "Q卡"
 
     /** 对话的名字:第一句话(只取第一行,附件那几行不算;只发了屏幕时是「你此刻的屏幕」);空对话为空。侧栏里用它称呼对话。 */
     fun title(exchanges: List<Exchange>): String =
