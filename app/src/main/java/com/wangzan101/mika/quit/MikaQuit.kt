@@ -15,6 +15,7 @@ import com.wangzan101.mika.settings.ChatGptSignInService
 import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.task.TaskService
 import com.wangzan101.mika.task.TriggerRuntime
+import com.wangzan101.mika.telegram.TelegramService
 import com.wangzan101.mika.wechat.WechatService
 
 /**
@@ -48,6 +49,7 @@ object MikaQuit {
         runCatching { app.stopService(Intent(app, TaskService::class.java)) }
         runCatching { app.stopService(Intent(app, McpService::class.java)) }
         runCatching { app.stopService(Intent(app, WechatService::class.java)) }
+        runCatching { app.stopService(Intent(app, TelegramService::class.java)) }
         runCatching { app.stopService(Intent(app, SandboxService::class.java)) }
         runCatching { app.stopService(Intent(app, ChatGptSignInService::class.java)) }
         (context as? Activity)?.finishAndRemoveTask()

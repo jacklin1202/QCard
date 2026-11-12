@@ -211,6 +211,7 @@ class TelegramRuntime(
 
     private fun invalidateToken() {
         store.setEnabled(false)
+        stop() // 先做进程内清理（registration/network/monitor），不能只依赖 service 的 onDestroy
         _state.value = TelegramConnectionState.NeedsBinding
         context.stopService(Intent(context, TelegramService::class.java))
     }
