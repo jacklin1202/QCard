@@ -11,6 +11,7 @@ import com.wangzan101.mika.chat.RetryAttachmentResult
 import com.wangzan101.mika.chat.RetryAttachmentStatus
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.chat.CurrentChat
+import com.wangzan101.mika.chat.DeleteBatch
 import com.wangzan101.mika.chat.SharedDraft
 import com.wangzan101.mika.chat.SharedDraftStore
 import com.wangzan101.mika.confirm.ConfirmationNotifier
@@ -376,6 +377,124 @@ class ChatViewModelTest {
         vm.addLibraryAttachment("a", PendingAttachment("content://library/a", "a.pdf", 1)) { released++ }
         assertTrue(vm.send("send", ok))
         runCurrent()
+        assertEquals(1, released)
+    }
+
+    @Test fun libraryBatchAddsFilesInOrderWithoutSwitchingDrafts() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        vm.input("draft A")
+        vm.openConversation("b")
+        vm.input("draft B")
+        val handles = (1..3).map { LibraryFileHandle.Workspace("origin", "/workspace/inbox/$it.pdf") }
+        val plan = vm.planLibraryAttachments("a", handles)
+        assertNotNull(plan)
+        assertEquals(handles, plan!!.accepted)
+        var released = 0
+        val staged = handles.mapIndexed { index, source ->
+            LibraryStaged(PendingAttachment("content://library/$index", "${index + 1}.pdf", 1), source) { released++ }
+        }
+        val result = vm.addLibraryAttachments("a", staged, plan.overLimit)
+        assertEquals(3, result.added)
+        assertEquals(0, result.duplicates)
+        assertEquals(0, result.full)
+        assertFalse(result.unavailable)
+        assertEquals(0, released)
+        assertEquals("draft B", vm.ui.value.input)
+        assertTrue(vm.ui.value.attachments.isEmpty())
+        vm.openConversation("a")
+        assertEquals("draft A", vm.ui.value.input)
+        assertEquals(listOf("1.pdf", "2.pdf", "3.pdf"), vm.ui.value.attachments.map { it.name })
+    }
+
+    @Test fun libraryBatchPlanSkipsDuplicateSourcesAndStopsAtCapacity() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        val existing = LibraryFileHandle.Workspace("origin", "/workspace/inbox/existing.pdf")
+        assertEquals(LibraryAttachmentResult.Added,
+            vm.addLibraryAttachment("a", PendingAttachment("content://library/existing", "existing.pdf", 1), existing))
+        repeat(7) { index ->
+            assertEquals(LibraryAttachmentResult.Added,
+                vm.addLibraryAttachment("a", PendingAttachment("content://library/fill-$index", "fill-$index.pdf", 1)))
+        }
+        val more = listOf(existing) + (1..2).map { LibraryFileHandle.Workspace("origin", "/workspace/inbox/new-$it.pdf") }
+        val plan = vm.planLibraryAttachments("a", more)!!
+        assertEquals(1, plan.duplicates)
+        assertEquals(listOf(more[1]), plan.accepted)
+        assertEquals(1, plan.overLimit)
+    }
+
+    @Test fun libraryBatchCommitRechecksCapacityAndReleasesRejectedCopies() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        repeat(8) { index ->
+            vm.addLibraryAttachment("a", PendingAttachment("content://library/fill-$index", "fill-$index.pdf", 1))
+        }
+        val first = LibraryFileHandle.Workspace("origin", "/workspace/inbox/first.pdf")
+        val second = LibraryFileHandle.Workspace("origin", "/workspace/inbox/second.pdf")
+        val plan = vm.planLibraryAttachments("a", listOf(first, second))!!
+        assertEquals(1, plan.accepted.size)
+        // 复制期间最后一个槽位被占掉:合并时重新检查。
+        vm.addLibraryAttachment("a", PendingAttachment("content://other/last", "last.pdf", 1))
+        val released = mutableListOf<String>()
+        val staged = listOf(first, second).mapIndexed { index, source ->
+            LibraryStaged(PendingAttachment("content://library/$index", "$index.pdf", 1), source) { released += "$index" }
+        }
+        val result = vm.addLibraryAttachments("a", staged, plan.overLimit)
+        assertEquals(0, result.added)
+        assertEquals(2, result.full)
+        assertEquals(setOf("0", "1"), released.toSet())
+        assertEquals(9, vm.ui.value.attachments.size)
+    }
+
+    @Test fun libraryBatchCommitSkipsDuplicatesAndReleasesTheirCopies() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        val source = LibraryFileHandle.Workspace("origin", "/workspace/inbox/a.pdf")
+        vm.addLibraryAttachment("a", PendingAttachment("content://library/existing", "a.pdf", 1), source)
+        var released = 0
+        val result = vm.addLibraryAttachments("a",
+            listOf(LibraryStaged(PendingAttachment("content://library/copy", "a.pdf", 1), source) { released++ }))
+        assertEquals(0, result.added)
+        assertEquals(1, result.duplicates)
+        assertEquals(1, released)
+    }
+
+    @Test fun libraryBatchReleasesEverythingWhenTargetIsGone() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        val source = LibraryFileHandle.Workspace("origin", "/workspace/inbox/a.pdf")
+        assertNotNull(vm.planLibraryAttachments("a", listOf(source)))
+        vm.deleteConversation("a")
+        var released = 0
+        val result = vm.addLibraryAttachments("a",
+            listOf(LibraryStaged(PendingAttachment("content://library/a", "a.pdf", 1), source) { released++ }), 0)
+        assertTrue(result.unavailable)
+        assertEquals(1, released)
+    }
+
+    @Test fun libraryBatchCopiesAreReleasedWhenRemoved() = runTest {
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, ConversationStore(tmp.newFolder()),
+            sandboxReady = MutableStateFlow(true))
+        runCurrent()
+        vm.openConversation("a")
+        val source = LibraryFileHandle.Workspace("origin", "/workspace/inbox/a.pdf")
+        var released = 0
+        val item = PendingAttachment("content://library/a", "a.pdf", 1)
+        val result = vm.addLibraryAttachments("a", listOf(LibraryStaged(item, source) { released++ }))
+        assertEquals(1, result.added)
+        assertEquals(0, released)
+        vm.removeAttachment(item.uri)
         assertEquals(1, released)
     }
 
@@ -1693,6 +1812,44 @@ class ChatViewModelTest {
         runCurrent()
         assertEquals("b", vm.ui.value.conversationId)
         assertEquals(listOf("订票"), vm.ui.value.exchanges.map { it.goal })
+    }
+
+    /** 批量删除:几条一起删,进度一条条往前走;一条删不掉不挡后面的,最后照实说几条失败。 */
+    @Test fun deletingABatchReportsProgressAndFailures() = runTest {
+        val dir = tmp.newFolder()
+        val store = ConversationStore(dir)
+        listOf("a", "b", "c").forEach { store.append(it, Turn("问题 $it", "好", "succeeded")) }
+        val blocker = java.io.File(dir, "b.json.tmp")
+        assertTrue(blocker.mkdir())
+        val removed = mutableListOf<String>()
+        val vm = ChatViewModel(
+            backgroundScope, state, stage, actions, store,
+            removeConversation = { id ->
+                store.delete(id)
+                removed += id
+            },
+        ).also { runCurrent() }
+
+        vm.deleteConversations(listOf("a", "b", "c"))
+        // 提交后当场从侧栏拿掉,不等后台删完
+        assertEquals(setOf("a", "b", "c"), vm.deleted.value)
+        assertEquals(DeleteBatch(3, 0, 0), vm.deleteBatch.value)
+
+        runCurrent()
+        assertEquals(listOf("a", "c"), removed)
+        assertEquals(setOf("a", "c"), vm.deleted.value)
+        assertEquals(listOf("b"), store.list().map { it.id })
+        assertEquals(DeleteBatch(3, 3, 1), vm.deleteBatch.value)
+        assertTrue(vm.deleteBatch.value!!.finished)
+
+        assertTrue(blocker.delete())
+        vm.deleteConversations(listOf("b"))
+        runCurrent()
+        assertEquals(listOf("a", "c", "b"), removed)
+        assertTrue(store.list().isEmpty())
+        assertEquals(DeleteBatch(1, 1, 0), vm.deleteBatch.value)
+        vm.clearDeleteBatch()
+        assertNull(vm.deleteBatch.value)
     }
 
     /** 侧栏里改名、置顶:存下来,侧栏按存下的重排(置顶的在「置顶」一段,最近置顶的在前);删掉的对话不再改。 */
@@ -3228,4 +3385,19 @@ class ChatViewModelTest {
         assertTrue(vm.send("新一句", ok))
         assertNull(vm.branchBefore(0))
     }
+    @Test fun personalTaskCanBeOpenedWhileOrdinaryConversationIsBusyWithoutStartingWork() = runTest {
+        val store = ConversationStore(tmp.newFolder())
+        store.append("personal-work", Turn("整理资料", "整理完成", "succeeded"))
+        val vm = vm(store)
+        vm.send("正在做原来的事", ok)
+        emit(TaskState.Running(1, "处理中"))
+        val originalId = vm.ui.value.conversationId
+        vm.openConversation("personal-work")
+        assertEquals(originalId, vm.ui.value.conversationId)
+        vm.openPersonalTask("personal-work")
+        assertEquals("personal-work", vm.ui.value.conversationId)
+        assertEquals("整理资料", vm.ui.value.exchanges.first().goal)
+        assertEquals(1, calls.count { it.startsWith("start:") })
+    }
+
 }

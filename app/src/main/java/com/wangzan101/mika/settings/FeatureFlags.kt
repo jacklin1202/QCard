@@ -18,6 +18,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** 功能开关。提速开关存成 [SpeedFlags.describe] 的格式,评测跑器可用参数覆盖。 */
 class FeatureFlags(private val prefs: SharedPreferences) {
+    fun personalStart(): Boolean = prefs.getBoolean(PERSONAL_START, false)
+
+    fun setPersonalStart(on: Boolean) {
+        prefs.edit().putBoolean(PERSONAL_START, on).apply()
+    }
+
     /** 还没做过的默认值升级(见 [SPEED_UPGRADES])各做一次;升级之后用户手动关掉就保持关闭。 */
     fun speedFlags(): SpeedFlags {
         val flags = prefs.getString(SPEED_FLAGS, null)?.let { runCatching { SpeedFlags.parse(it) }.getOrNull() } ?: SpeedFlags.OFF
@@ -101,6 +107,36 @@ class FeatureFlags(private val prefs: SharedPreferences) {
 
     fun setSelfConfig(on: Boolean) {
         prefs.edit().putBoolean(SELF_CONFIG, on).commit()
+    }
+
+    /**
+     * 允许 Mika 操作自己的界面(见 core 的 SelfPort):打开 Mika 的页、把工作区文件用 App 内查看器打开、
+     * 发通知、写剪贴板。默认关;模型改不了这个开关。
+     */
+    fun selfOperate(): Boolean = prefs.getBoolean(SELF_OPERATE, false)
+
+    fun setSelfOperate(on: Boolean) {
+        prefs.edit().putBoolean(SELF_OPERATE, on).commit()
+    }
+
+    /**
+     * 允许用户在对话里的虚拟屏小窗直接操作(点 / 滑 / 返回),不用把 App 整个挪到主屏。
+     * 默认关:开着时小窗展开后点画面会真实注入到虚拟屏,手滑一下可能点歪 AI 正在跑的任务。
+     */
+    fun pipOperate(): Boolean = prefs.getBoolean(PIP_OPERATE, false)
+
+    fun setPipOperate(on: Boolean) {
+        prefs.edit().putBoolean(PIP_OPERATE, on).commit()
+    }
+
+    /**
+     * 允许外部脚本经广播(com.wangzan101.mika.SCHEDULE)建定时任务;默认关。
+     * 开着时仍受限流(每分钟几条)并标记来源为「外部脚本」,出事能追溯。
+     */
+    fun externalSchedule(): Boolean = prefs.getBoolean(EXTERNAL_SCHEDULE, false)
+
+    fun setExternalSchedule(on: Boolean) {
+        prefs.edit().putBoolean(EXTERNAL_SCHEDULE, on).commit()
     }
 
     /** 悬浮胶囊:关闭、有任务时显示(默认)、一直显示。 */
@@ -197,7 +233,11 @@ class FeatureFlags(private val prefs: SharedPreferences) {
         private const val MUTE_TARGET = "mute_target"
         private const val OPERATING_PACE = "operating_pace"
         private const val SELF_CONFIG = "self_config"
+        private const val SELF_OPERATE = "self_operate"
+        private const val PIP_OPERATE = "pip_operate"
+        private const val EXTERNAL_SCHEDULE = "external_schedule"
         private const val THEME_MODE = "theme_mode"
+        private const val PERSONAL_START = "personal_start"
         private const val CAPSULE_MODE = "capsule_mode"
         private const val CAPSULE_IDLE_OPACITY = "capsule_idle_opacity"
         private const val QUIT_REQUESTED = "quit_requested"
