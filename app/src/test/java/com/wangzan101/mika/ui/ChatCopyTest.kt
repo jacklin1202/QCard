@@ -21,6 +21,7 @@ class ChatCopyTest {
         assertEquals(3, examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
         assertEquals(ChatCopy.ExampleKind.Web, examples.first().kind)
         assertTrue(examples.first().text.contains("X.com"))
+        assertTrue(examples.first().text.contains("Chrome"))
         assertEquals(ChatCopy.examples.map { it.text }, ChatCopy.recommendationSeeds().map { it.first })
         assertEquals(ChatCopy.examples.map { it.text }, ChatCopy.recommendationSeeds().map { it.second })
     }

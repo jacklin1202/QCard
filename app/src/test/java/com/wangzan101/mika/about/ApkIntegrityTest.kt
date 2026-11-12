@@ -15,16 +15,16 @@ class ApkIntegrityTest {
 
     @Test fun rejectsUntrustedDownloads() {
         for (url in listOf(
-            "http://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com.evil.test/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/other/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/wangzan101/Mika/releases/download/../../other.apk",
-            "https://github.com/wangzan101/Mika/releases/download/%2e%2e/%2E%2e/%2e%2e/%2e%2e/other/x.apk",
-            "https://objects.githubusercontent.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.zip",
-            "https://github.com/wangzan101/Mika/releases/tag/v0.2.0",
-            "https://user:pass@github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com:8443/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
+            "http://github.com/jacklin1202/QCard/releases/download/v1.0/QCard.apk",
+            "https://github.com.evil.test/jacklin1202/QCard/releases/download/v1.0/QCard.apk",
+            "https://github.com/other/QCard/releases/download/v1.0/QCard.apk",
+            "https://github.com/jacklin1202/QCard/releases/download/../../other.apk",
+            "https://github.com/jacklin1202/QCard/releases/download/%2e%2e/%2E%2e/%2e%2e/%2e%2e/other/x.apk",
+            "https://objects.githubusercontent.com/jacklin1202/QCard/releases/download/v1.0/QCard.apk",
+            "https://github.com/jacklin1202/QCard/releases/download/v1.0/QCard.zip",
+            "https://github.com/jacklin1202/QCard/releases/tag/v1.0",
+            "https://user:pass@github.com/jacklin1202/QCard/releases/download/v1.0/QCard.apk",
+            "https://github.com:8443/jacklin1202/QCard/releases/download/v1.0/QCard.apk",
         )) rejects { ApkIntegrity.requireOfficialUrl(url) }
     }
 
