@@ -545,7 +545,7 @@ class ProviderStore(
      */
     @Synchronized
     fun setMainFallback(slot: Int, configId: String?): Boolean {
-        if (slot < 0 || slot > MAX_MAIN_FALLBACKS) return false
+        if (slot < 0 || slot >= MAX_MAIN_FALLBACKS) return false
         if (configId != null && _configs.value.none { it.id == configId }) return false
         val current = _roles.value.mainFallbacks
         val next = when {
@@ -694,8 +694,12 @@ class ProviderStore(
             contextTokens = settings.windowTokens ?: adjusted.capabilities.contextTokens,
             compactionTriggerTokens = settings.triggerTokens,
         ))
+        // 备援接手时带上主模型设的思考强度,但只在备援自己写明支持这个档位时才带:
+        // 不支持就不指定、用它自己的默认,不能让请求因为这个参数被拒(MK-1 B-D1)。
+        val mainEffort = _roles.value.reasoningEffort(ModelRole.Main)
+        val effort = mainEffort?.takeIf { ReasoningOptions.of(configured, listed)?.levels?.contains(it) == true }
         return modelFactory(configured, apiKey(raw.id), listed?.endpoint, ClientSetup(
-            headers(p?.sessionHeader, session), thinkingTypes = listed?.thinkingTypes,
+            headers(p?.sessionHeader, session), reasoningEffort = effort, thinkingTypes = listed?.thinkingTypes,
             readTimeoutSeconds = settings?.readTimeoutSeconds,
         )).metered(source, usage, ::checkDailyBudget)
     }
@@ -708,7 +712,10 @@ class ProviderStore(
     fun mainFallbackChain(session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> {
         val models = ArrayList<ChatModel>()
         val tags = ArrayList<String?>()
+        // 旧设定里若把主模型自己也排进备援,载入时略过:切给自己没有意义(MK-1 B-D2)。
+        val mainId = _roles.value.resolve(ModelRole.Main)
         for (id in _roles.value.mainFallbacks) {
+            if (id == mainId) continue
             val cfg = configById(id) ?: continue
             val m = modelForConfig(id, session) ?: continue
             models += m

@@ -198,6 +198,7 @@ internal fun fixedChoices(role: ModelRole): List<RoleChoice> = when (role) {
 fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActions, onBack: () -> Unit,
     titleOverride: String? = null, hintOverride: String? = null,
     pickedOverride: ((String, String) -> Boolean)? = null,
+    exclude: ((String, String) -> Boolean)? = null,
     clearAction: (() -> Unit)? = null, clearSelected: Boolean = false,
 ) {
     val c = MikaTheme.colors
@@ -231,7 +232,7 @@ fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActi
         }
         var anyShown = false
         groups.forEach { (p, options) ->
-            val shown = options.filter { q.isEmpty() || it.id.contains(q, ignoreCase = true) }
+            val shown = options.filter { (q.isEmpty() || it.id.contains(q, ignoreCase = true)) && exclude?.invoke(p.id, it.id) != true }
             // 这家列不出模型:手填是唯一的选法
             val noList = p.models?.isEmpty() == true
             if (q.isNotEmpty() && shown.isEmpty()) return@forEach

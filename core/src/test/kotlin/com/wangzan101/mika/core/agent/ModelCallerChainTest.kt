@@ -69,6 +69,53 @@ class ModelCallerChainTest {
         assertEquals(1, main.calls)
     }
 
+    @Test fun chainExhaustionSurfacesPrimaryError() = runTest {
+        // 整条链都失败:交出的是主模型最初的错误,不是最后一家备援的(MK-1 A-D1 第二点)。
+        val mainErr = ModelError.Server(500)
+        val main = Scripted("main", mainErr)
+        val backup = Scripted("backup", ModelError.Server(503))
+        val caller = caller(main, listOf(backup))
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        assertSame(mainErr, thrown)
+        assertEquals(1, backup.calls)
+    }
+
+    @Test fun fallbackBudgetErrorPropagatesAsItself() = runTest {
+        // 备援报的是任务级预算:说的是整个任务,照它自己交出,不被主模型的错盖掉。
+        val budgetErr = ModelError.TaskBudgetExceeded(100, 100)
+        val main = Scripted("main", ModelError.QuotaExceeded())
+        val backup = Scripted("backup", budgetErr)
+        val caller = caller(main, listOf(backup))
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        assertSame(budgetErr, thrown)
+    }
+
+    @Test fun server4xxSwitchesWithoutSameModelRetry() = runTest {
+        // 4xx 是这份请求本身被拒:同一家重试也没用,直接换下一家(MK-1 A-D1 第一点)。
+        val main = Scripted("main", ModelError.Server(400))
+        val backup = Scripted("backup", null)
+        val caller = ModelCaller(main, toolDispatcher(FakeScreen()), null, SpeedFlags.OFF,
+            RetryPolicy(maxRetries = 3, jitter = { 0.0 }), {}, { 0 }, fallbacks = listOf(backup)).also { it.reset("") }
+        caller.ask(history, emptyList(), step = 1)
+        assertEquals(1, main.calls)
+        assertEquals(1, backup.calls)
+        assertSame(backup, caller.lastMainUsed)
+    }
+
+    @Test fun server5xxRetriesSameModelFirst() = runTest {
+        // 5xx 是一时的故障:先在同一家把重试用完,才换备援。
+        val main = Scripted("main", ModelError.Server(500))
+        val backup = Scripted("backup", null)
+        val caller = ModelCaller(main, toolDispatcher(FakeScreen()), null, SpeedFlags.OFF,
+            RetryPolicy(maxRetries = 3, jitter = { 0.0 }), {}, { 0 }, fallbacks = listOf(backup)).also { it.reset("") }
+        caller.ask(history, emptyList(), step = 1)
+        assertEquals(4, main.calls)
+        assertEquals(1, backup.calls)
+        assertSame(backup, caller.lastMainUsed)
+    }
+
     @Test fun dailyBudgetSkipsSameProvider() = runTest {
         val main = Scripted("main", ModelError.DailyBudgetExceeded("OpenRouter", 100, 100))
         val same = Scripted("same", null)

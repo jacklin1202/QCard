@@ -200,6 +200,11 @@ fun ModelSetupScreen(
                     ui.roles.mainFallbacks.getOrNull(slot)?.let { id -> ui.configs.firstOrNull { it.id == id } }
                         ?.let { it.providerId == pid && it.model == model } == true
                 },
+                // 主模型自己不列在备援选单里:选它当备援没有意义(MK-1 B-D2)。
+                exclude = { pid, model ->
+                    val mainCfg = ui.configs.firstOrNull { it.id == ui.roles.resolve(ModelRole.Main) }
+                    mainCfg != null && mainCfg.providerId == pid && mainCfg.model == model
+                },
                 clearAction = { vm.clearFallback(slot); pickingFallback = null },
                 clearSelected = ui.roles.mainFallbacks.getOrNull(slot) == null,
             )

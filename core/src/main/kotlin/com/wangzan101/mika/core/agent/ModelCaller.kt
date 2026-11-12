@@ -161,6 +161,9 @@ internal class ModelCaller(
      */
     suspend fun ask(history: List<Message>, specs: List<ToolSpec>, step: Int, using: ChatModel = model, onText: ((String) -> Unit)? = null): ModelReply {
         if (using !== model) return complete(viewFor(history, using), specs, using, retry, step, onText)
+        // 整条链都失败时交出主模型最初的那个错误(MK-1 A-D1):只剩最后一家备援的错会把主模型真正的
+        // 问题(例如它拒收这份请求)盖掉;任务级预算错误说的是整个任务,不是某个模型,照它自己交出。
+        var firstError: ModelError? = null
         while (true) {
             val current = chain[chainIndex]
             try {
@@ -168,7 +171,11 @@ internal class ModelCaller(
                 lastMainUsed = current
                 return reply
             } catch (e: ModelError) {
-                val next = Failover.nextIndex(e, chainIndex, chainTags, chain.size) ?: throw e
+                if (firstError == null) firstError = e
+                val next = Failover.nextIndex(e, chainIndex, chainTags, chain.size) ?: throw when (e) {
+                    is ModelError.TaskBudgetExceeded, is ModelError.DailyBudgetExceeded -> e
+                    else -> firstError ?: e
+                }
                 onText?.invoke("")
                 emit(RunEvent.State(now(), "model_switch", "${current.name} -> ${chain[next].name} ${RetryPolicy.label(e)}"))
                 chainIndex = next
