@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="telegram_notif_title">QCard is listening on Telegram</string>
+    <string name="telegram_notif_body">Send a message to your bot to start a task.</string>
+    <string name="telegram_turn_off">Turn off</string>
+    <string name="telegram_bind_success">Bound. Send me a message to start a task.</string>
+    <string name="telegram_stop_idle">No task is running right now.</string>
+</resources>

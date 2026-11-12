@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="telegram_notif_title">Q卡正在 Telegram 上聆聽</string>
+    <string name="telegram_notif_body">傳訊息給你的 Bot 就能開始一個任務。</string>
+    <string name="telegram_turn_off">關閉</string>
+    <string name="telegram_bind_success">已綁定。傳一則訊息給我來開始任務。</string>
+    <string name="telegram_stop_idle">目前沒有進行中的任務。</string>
+</resources>

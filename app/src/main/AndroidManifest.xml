@@ -239,6 +239,15 @@
                 android:value="Keeps the user-enabled WeChat bot connection available so private messages can be handed to the app's existing task service" />
         </service>
 
+        <service
+            android:name=".telegram.TelegramService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user-enabled Telegram bot connection available so private messages can be handed to the app's existing task service" />
+        </service>
+
         <!--
             电脑连接(MCP):用户在设置里打开、或电脑经 USB 调试打开后才运行,让监听端口在后台也开着;关掉就停。
             对外开放只为让 adb shell 能起它(am start-foreground-service):调用方必须持有 INTERACT_ACROSS_USERS_FULL,

@@ -42,6 +42,7 @@ object MikaQuit {
         runCatching { TriggerRuntime.suspendAlarms(app) }
         runCatching { RuntimePreparer.stop(app) }
         runCatching { app.wechat.stop() }
+        runCatching { app.telegram.stop() }
         runCatching { app.mcp.stopServer() }
         runCatching { app.chatGptSignIn.cancel() }
         runCatching { app.stopService(Intent(app, TaskService::class.java)) }
