@@ -30,3 +30,10 @@ class MainDisplayMode(private val prefs: SharedPreferences) {
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     }
 }
+
+/**
+ * 这一轮任务要不要提供内置浏览器工具:系统没装 WebView 时不提供;
+ * 主屏模式(雷电适配)开着时也不提供——任务只用主屏上的真 App,不走后台网页。
+ */
+fun webToolsAvailable(webInstalled: Boolean, mainDisplayEnabled: Boolean): Boolean =
+    webInstalled && !mainDisplayEnabled

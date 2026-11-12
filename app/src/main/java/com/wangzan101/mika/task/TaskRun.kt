@@ -97,6 +97,7 @@ import com.wangzan101.mika.record.RunStore
 import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.RunApproval
 import com.wangzan101.mika.settings.Prerequisites
+import com.wangzan101.mika.settings.webToolsAvailable
 import com.wangzan101.mika.takeover.HandoverActivity
 import com.wangzan101.mika.takeover.HandoverActivityCounter
 import com.wangzan101.mika.takeover.Takeover
@@ -510,6 +511,9 @@ class TaskRun(
         var phoneDisplayMain = false
         // 这轮有没有拿着主屏租约(PhoneServices.mainDisplayLease):收尾要还,重建屏重试时不要重复拿
         var phoneDisplayMainLease = false
+        // 本分支(ldplayer-adapt):主屏模式在开工时读一次定住;中途改设定只影响下一轮,
+        // 免得建屏(create)与网页工具供给(下面的 web)在同一轮里各读各的、结论不一致
+        val mainDisplayOn = phoneServices.mainDisplayMode.enabled.value
         var shellDeath: IBinder.DeathRecipient? = null
         var shellBinder: IBinder? = null
         val traces = (service.application as MikaApp).detailedTraces
@@ -621,7 +625,7 @@ class TaskRun(
                         return com.wangzan101.mika.cap.phone.display.MainDisplay(a11y, metrics.widthPixels, metrics.heightPixels, suspended = { handoverRef?.handedOver == true || gate?.movedAwayPending == true || gate?.userOnPagePending == true || _state.value !is TaskState.Running })
                     }
                     suspend fun create(): com.wangzan101.mika.cap.phone.display.DisplayHandle =
-                        if (phoneServices.mainDisplayMode.enabled.value) createMain()
+                        if (mainDisplayOn) createMain()
                         else when (val got = phoneServices.displayStore.obtain(key, shell.asBinder()) {
                             withContext(Dispatchers.IO) { buildDisplay() }
                         }) {
@@ -774,9 +778,9 @@ class TaskRun(
             // 改名前沉淀的个人技能:里面的旧工具名载入时换成现在的
             val catalog = GuideCatalog.withPersonal(skills, memoryRuntime.skills(), legacyNames()::rewrite)
             // 内置浏览器:每个任务自己的后台网页显示、标签池和脚本引擎,第一次打开网址时才建(只用手机的任务不建);
-            // 系统里没有 WebView 时不提供网页工具
+            // 系统里没有 WebView 时不提供网页工具;主屏模式(雷电适配)开着时也不提供,任务只用主屏上的真 App
             val webInstalled = runCatching { WebViewCompat.getCurrentWebViewPackage(service) != null }.getOrDefault(false)
-            val web = if (!webInstalled) null else LazyWebPort {
+            val web = if (!webToolsAvailable(webInstalled, mainDisplayOn)) null else LazyWebPort {
                 val stack = resources.acquire(Dispatchers.Main, WebStack::close) { WebStack.create(
                         service, key, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
                         // 下载、上传走本对话的工作区:只是 App 私有目录里的文件夹,不要求沙箱已装好
