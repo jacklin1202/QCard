@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import android.os.ParcelFileDescriptor
 import java.io.IOException
+import com.wangzan101.mika.settings.MainDisplayMode
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
@@ -106,6 +107,8 @@ class HelperHub(context: Context) {
         // 换了新的助手:旧的随后会被新的结束,它的死亡通知因为不是当前这个而被忽略
         handoffDiagnostics.clear()
         _shell.value = shell
+        // 把「此刻有没有主屏任务在跑」告诉新助手:有它才把主屏当作可服务的屏(见 ShellService.servedDisplay)
+        MainDisplayMode.syncServedWanted { w -> runCatching { shell.setMainDisplayServed(w) } }
         if (extras?.containsKey(HelperHandoff.KEY_RESTORED_AT) == true) {
             _restores.value = HelperRestoreReport(
                 extras.getLong(HelperHandoff.KEY_RESTORED_AT), extras.getInt(HelperHandoff.KEY_RESTORES), extras.getLong(HelperHandoff.KEY_GAVE_UP_AT),

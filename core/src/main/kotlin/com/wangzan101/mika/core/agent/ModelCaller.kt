@@ -170,6 +170,7 @@ internal class ModelCaller(
         // 整条链都失败时的说法(MK-1 第 2 批):以主模型最初的错误为主、附每个备援错在哪(见 [terminalError]);
         // 只试过一个模型就原样交出,和没有备援时一致。每步先把错误记进 [trialLog]:切过去之后,
         // 后面的步直接由备援起问,主模型的错不在手边,靠这份记录才拼得回整条链的说法。
+        val logStart = trialLog.size
         while (true) {
             val current = chain[chainIndex]
             try {
@@ -179,7 +180,7 @@ internal class ModelCaller(
             } catch (e: ModelError) {
                 if (trialLog.none { it.first == chainIndex }) trialLog += chainIndex to e
                 if (chainIndex == 0 && headError == null) headError = e
-                val next = Failover.nextIndex(e, chainIndex, chainTags, chain.size) ?: throw terminalError(e)
+                val next = Failover.nextIndex(e, chainIndex, chainTags, chain.size) ?: throw terminalError(e, logStart)
                 onText?.invoke("")
                 emit(RunEvent.State(now(), "model_switch", "${current.name} -> ${chain[next].name} ${RetryPolicy.label(e)}"))
                 chainIndex = next
@@ -188,10 +189,10 @@ internal class ModelCaller(
     }
 
     /** 链上不再换了,决定交出哪个错误:预算错误原样;只试过一个模型原样;试过整条链包成 [ModelError.ChainFailed]。 */
-    private fun terminalError(e: ModelError): ModelError {
-        // 当前错误就是预算错误时以它为准;否则链上较早的预算错误优先于包装(审 T-1112-74a8f2 D1):预算错误不包 ChainFailed,原样交出
+    private fun terminalError(e: ModelError, logStart: Int): ModelError {
+        // 当前错误就是预算错误时以它为准;否则本步内较早的预算错误优先于包装(只算本步新记的,旧步的预算错误不原样盖掉本步的失败)(审 T-1112-74a8f2 D1):预算错误不包 ChainFailed,原样交出
         if (e is ModelError.TaskBudgetExceeded || e is ModelError.DailyBudgetExceeded) return e
-        trialLog.map { it.second }.firstOrNull {
+        trialLog.drop(logStart).map { it.second }.firstOrNull {
             it is ModelError.TaskBudgetExceeded || it is ModelError.DailyBudgetExceeded
         }?.let { return it }
         return if (trialLog.size < 2) e

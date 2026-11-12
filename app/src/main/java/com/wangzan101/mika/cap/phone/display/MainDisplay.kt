@@ -82,7 +82,8 @@ class MainDisplay(
         } catch (t: Throwable) {
             return // 截不到就留旧帧,下一轮再试
         }
-        if (released) {
+        if (released || suspended()) {
+            // 截图期间被释放、或刚进暂停:这一帧不发布(暂停中不留画面的语意要守住),回收掉
             (shot as? ScreenAccessibility.MainShot.Ok)?.bitmap?.recycle()
             return
         }
@@ -111,7 +112,7 @@ class MainDisplay(
         }
     }
 
-    private fun blackFrame(): Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    private fun blackFrame(): Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.BLACK) }
 
     /** 预览小图:短边缩到 [PREVIEW_SHORT_SIDE] 以内,和虚拟屏预览同一规格。 */
     private fun previewOf(bmp: Bitmap): Bitmap {

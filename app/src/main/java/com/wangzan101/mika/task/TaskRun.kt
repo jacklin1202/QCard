@@ -520,9 +520,13 @@ class TaskRun(
         var phoneDisplayMain = false
         // 这轮有没有拿着主屏租约(PhoneServices.mainDisplayLease):收尾要还,重建屏重试时不要重复拿
         var phoneDisplayMainLease = false
+        // 这轮有没有向「助手可服务主屏」计数登记过(MainDisplayMode.mainTaskStarted):收尾要对称注销
+        var mainServedRegistered = false
         // 本分支(ldplayer-adapt):主屏模式在开工时读一次定住;中途改设定只影响下一轮,
         // 免得建屏(create)与网页工具供给(下面的 web)在同一轮里各读各的、结论不一致
         val mainDisplayOn = phoneServices.mainDisplayMode.enabled.value
+        // 主屏模式:向计数登记本轮,再把助手该有的服务状态同步过去
+        // (计数制:平行任务里只要还有主屏任务在跑,后开的一般任务不会把它关掉)
         var shellDeath: IBinder.DeathRecipient? = null
         var shellBinder: IBinder? = null
         val traces = (service.application as MikaApp).detailedTraces
@@ -548,6 +552,12 @@ class TaskRun(
         )
         sideScope = side
         try {
+            if (mainDisplayOn && !conditionCheck) {
+                phoneServices.mainDisplayMode.mainTaskStartedAndSync { w ->
+                    mainServedRegistered = true
+                    phoneServices.hub.shell.value?.let { s -> runCatching { s.setMainDisplayServed(w) } }
+                }
+            }
             // 用户在「干活时」关掉了常亮就不拿唤醒锁;开跑就按此刻的状态(准备中)拿上:
             // 开模型、读知识、选路线、判断意图这些第一步之前的准备和推理期间屏幕也不熄
             awake = if (FeatureFlags.get(service).keepScreenOn()) KeepAwake(service.wakeLock.lease(), side).also { it.onState(_state.value) } else null
@@ -653,7 +663,8 @@ class TaskRun(
                         create()
                     }.also { d ->
                         _displayId.value = d.displayId
-                        _pipInput.value = PipInputImpl(shell, d)
+                        // 小窗直接操作只对虚拟屏成立;主屏模式没有小窗,留 null。
+                        _pipInput.value = (d as? AgentDisplay)?.let { PipInputImpl(shell, it) }
                         side.launch {
                             combine(d.frames, _appShown.flow) { frame, shown -> frame to shown }.collect { (frame, shown) ->
                                 if (dispatcher?.surface != WEB) {
@@ -808,7 +819,7 @@ class TaskRun(
             // 内置浏览器:每个任务自己的后台网页显示、标签池和脚本引擎,第一次打开网址时才建(只用手机的任务不建);
             // 系统里没有 WebView 时不提供网页工具;主屏模式(雷电适配)开着时也不提供,任务只用主屏上的真 App
             val webInstalled = runCatching { WebViewCompat.getCurrentWebViewPackage(service) != null }.getOrDefault(false)
-            val web = if (!webToolsAvailable(webInstalled, mainDisplayOn)) null else LazyWebPort {
+            val web = if (!webToolsAvailable(webInstalled, mainDisplayOn && !conditionCheck)) null else LazyWebPort {
                 val stack = resources.acquire(Dispatchers.Main, WebStack::close) { WebStack.create(
                         service, key, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
                         // 下载、上传走本对话的工作区:只是 App 私有目录里的文件夹,不要求沙箱已装好
@@ -1106,10 +1117,10 @@ class TaskRun(
             return end.also { usedGroups = agent.usedGroups.toList() }.let(::withRetestHint)
         } finally {
             if (resultReadyAtMs == 0L) resultReadyAtMs = SystemClock.elapsedRealtime()
+            try {
             handoffUnconsumed()
-            // 主屏模式:停掉主屏取帧(屏本身是系统的,不放),再还主屏租约
+            // 主屏模式:先停掉主屏取帧(屏本身是系统的,不放);租约与服务状态等全部收尾做完才在最后还/注销
             if (phoneDisplayMain) runCatching { phone?.display?.current?.release() }
-            if (phoneDisplayMainLease) runCatching { phoneServices.mainDisplayLease.unlock() }
             side.cancel()
             _frames.value = null
             _phoneFrames.value = null
@@ -1162,6 +1173,14 @@ class TaskRun(
             // 常驻屏:解除本轮占用,屏本身留着给下一轮(助手死了只清自己那一代的屏)。
             // binder 用 connectPhone 时存下的 shellBinder:这里 phone 已经清成 null,从它取永远是空的。
             if (phoneDisplayShared) withContext(NonCancellable) { runCatching { phoneServices.displayStore.finishUse(key, shellBinder, shellDied) } }
+            // 主屏租约最后才还:静音还原、屏与网页的收尾都结束了,下一个主屏任务才进场(不然两边的收尾会打架)
+            } finally {
+                if (phoneDisplayMainLease) runCatching { phoneServices.mainDisplayLease.unlock() }
+            // 主屏任务注销:没有主屏任务在跑时,才叫助手把主屏服务关掉
+                if (mainServedRegistered) phoneServices.mainDisplayMode.mainTaskEndedAndSync { w ->
+                    phoneServices.hub.shell.value?.let { s -> runCatching { s.setMainDisplayServed(w) } }
+                }
+            }
         }
     }
 
@@ -1285,25 +1304,25 @@ class TaskRun(
         // TYPE_TOUCH_INTERACTION_START 只报真实触摸;助手刚换步 1.2 秒内是它自己在动手,那段先不算)。
         side.launch(Dispatchers.IO) {
             // 先等这轮的屏定下来:不是主屏就直接收工,不在虚拟屏模式下留一个常驻轮询;
-            // 一直没建屏(纯对话任务)或任务已收尾也收工
-            var waited = 0
+            // 一直没建屏就等到任务收尾:先做别的事、晚一点才开 App 的任务也要有人看管
             while (true) {
                 val d = p.display.current
                 if (d != null) {
                     if (d.displayId != Display.DEFAULT_DISPLAY) return@launch
                     break
                 }
-                if (_state.value is TaskState.Terminal || ++waited > 240) return@launch
+                if (_state.value is TaskState.Terminal) return@launch
                 delay(MAIN_WATCH_MS)
             }
             // 数主屏上的真实触摸(与接管计数同一条无障碍事件流)
             val touches = java.util.concurrent.atomic.AtomicLong(0)
-            side.launch(Dispatchers.IO) {
+            val touchCollector = side.launch(Dispatchers.IO) {
                 runCatching {
                     p.a11y.eventsFor(Display.DEFAULT_DISPLAY).collect { e ->
-                        // Mika 自己浮层上的触摸(点胶囊、按继续)不算介入:包名是 Mika 自己的就跳过
+                        // 介入只算用户在 App 里的真实触摸:Mika 自己浮层上的(点胶囊、按继续)与系统界面的(下拉通知栏、权限对话框)都不算
+                        val pkg = e.packageName?.toString()
                         if (e.eventType == android.view.accessibility.AccessibilityEvent.TYPE_TOUCH_INTERACTION_START &&
-                            e.packageName?.toString() != p.a11y.packageName
+                            pkg != null && pkg != p.a11y.packageName && pkg !in MAIN_SYSTEM_PKGS
                         ) touches.incrementAndGet()
                     }
                 }
@@ -1314,7 +1333,9 @@ class TaskRun(
             var lastStepAt = 0L
             while (true) {
                 delay(MAIN_WATCH_MS)
-                if (p.display.current?.displayId != Display.DEFAULT_DISPLAY || handoverRef?.handedOver == true) { streak = 0; continue }
+                val curDisplay = p.display.current
+                if (curDisplay != null && curDisplay.displayId != Display.DEFAULT_DISPLAY) { touchCollector.cancel(); return@launch }
+                if (curDisplay?.displayId != Display.DEFAULT_DISPLAY || handoverRef?.handedOver == true) { streak = 0; lastTouches = touches.get(); continue }
                 val running = _state.value as? TaskState.Running
                 if (running != null && running.step != lastStep) {
                     lastStep = running.step

@@ -98,11 +98,12 @@ class AgentDisplayStore<T : Any>(
      * 任务收尾:屏留着,只解除占用。助手已死时只清「自己那一代」的屏——若仓库里的屏
      * 已经是新助手重建的、或正被别的任务用着,晚到的收尾不许碰它(竞态:旧任务的
      * shell 死了,新任务先一步重建了常驻屏,旧任务的收尾才到)。[binder] 是这轮
-     * 建屏/用屏时那条 shell 连接的身份令牌,不知道时传 null(只靠占用检查兜底)。
+     * 建屏/用屏时那条 shell 连接的身份令牌;传 null 时只解除占用、不放屏
+     * (放屏必须出示令牌且对得上,免得晚到的收尾误关新一代的屏)。
      */
     suspend fun finishUse(key: String, binder: Any?, shellDied: Boolean) = mutex.withLock {
         if (userKey == key) userKey = null
-        if (shellDied && userKey == null && (binder == null || shellBinder === binder)) dropLocked()
+        if (shellDied && userKey == null && binder != null && shellBinder === binder) dropLocked()
         publish()
     }
 

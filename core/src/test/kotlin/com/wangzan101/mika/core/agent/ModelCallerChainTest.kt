@@ -113,6 +113,22 @@ class ModelCallerChainTest {
         assertEquals(listOf("main", "backup"), chain.entries.map { it.first })
     }
 
+    @Test fun laterStepBudgetErrorDoesNotBareHijack() = runTest {
+        // 第一步主模型每日预算用完、切到别家备援并成功;第二步备援以自己的错收尾:旧步的预算错误不能原样盖掉本步的失败,
+        // 要包成整条链失败、两个错都交代清楚(审 T-1112-092f7a round2 D2 的范围修正)。
+        val budget = ModelError.DailyBudgetExceeded("OpenRouter", 100, 100)
+        val main = Scripted("main", budget)
+        val backup = Scripted("backup", null)
+        val caller = caller(main, listOf(backup), tags = listOf("OpenRouter", "APInex"))
+        caller.ask(history, emptyList(), step = 1)
+        backup.fail = ModelError.Server(500)
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 2) } catch (e: ModelError) { thrown = e }
+        val chain = thrown as ModelError.ChainFailed
+        assertSame(budget, chain.primary)
+        assertEquals(listOf("main", "backup"), chain.entries.map { it.first })
+    }
+
     @Test fun singleModelFailureIsNotWrapped() = runTest {
         // 没有备援、只试过一个模型:原样交出,不包 ChainFailed。
         val err = ModelError.BadResponse("HTTP 400 wrapped")

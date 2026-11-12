@@ -132,6 +132,9 @@ interface IMikaShell {
     boolean flushCallAudio(IBinder owner) = 55;
     Bundle callAudioStats(IBinder owner) = 56;
 
+    // App 告知主屏模式现状:开着时主屏(display 0)才算可服务的屏;关着时只认 Mika 自己的虚拟屏,不碰用户主屏
+    void setMainDisplayServed(boolean served) = 57;
+
     // 沿用早先定下的销毁事务号;AIDL 要求要么全部方法编号要么都不编号
     void destroy() = 16777114;
 }

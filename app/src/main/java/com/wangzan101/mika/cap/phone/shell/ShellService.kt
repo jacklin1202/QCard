@@ -65,6 +65,9 @@ class ShellService(
 ) : IMikaShell.Stub() {
     private val context: Context = ShellContext.create()
     private val displays = HashMap<Int, VirtualDisplay>()
+    /** 主屏(display 0)可不可以当作 Mika 的屏来服务:只有 App 那边主屏模式开着时才行(App 在交接与每轮任务开始时告知);
+     * 默认不行——免得开关关着时误传 0 的调用碰到用户主屏。 */
+    @Volatile private var mainDisplayServed = false
     private var orientationWatch: DisplayOrientationWatch? = null
     private val requestedOrientations = ConcurrentHashMap<Int, Int>()
     /** 被静音的包 → 静音前的 PLAY_AUDIO 模式("default" 表示原先未设置),落在 [stateDir] 里,进程被杀后下次启动接着恢复。 */
@@ -173,7 +176,11 @@ class ShellService(
      * 主屏模式(ldplayer-adapt 分支)的任务用屏判定:主屏也算「能往上送东西」的屏(启动、输入、读顶层任务);
      * 建屏、放屏、任务收尾仍只认自有虚拟屏,不用这个。
      */
-    private fun servedDisplay(displayId: Int): Boolean = displayId == Display.DEFAULT_DISPLAY || ownDisplay(displayId)
+    private fun servedDisplay(displayId: Int): Boolean = (displayId == Display.DEFAULT_DISPLAY && mainDisplayServed) || ownDisplay(displayId)
+
+    override fun setMainDisplayServed(served: Boolean) {
+        mainDisplayServed = served
+    }
 
     override fun releaseDisplay(displayId: Int) {
         awake.stop(displayId)
@@ -1120,7 +1127,7 @@ class ShellService(
         return injectPair(down, up, displayId) { exec("input", "-d", "$displayId", "keyevent", "$keyCode") == 0 }
     }
 
-    /** 自有虚拟屏上的 Ctrl+A / Ctrl+V,同时发送修饰键按下和抬起;松开修饰键失败不会把已经发出的正文判成未发送。 */
+    /** 可服务屏(自有虚拟屏,或主屏模式下登记中的主屏)上的 Ctrl+A / Ctrl+V,同时发送修饰键按下和抬起;松开修饰键失败不会把已经发出的正文判成未发送。 */
     override fun injectCtrlKey(displayId: Int, keyCode: Int): Int {
         if (!servedDisplay(displayId)) return AsciiTextKeys.NOT_SENT
         if (keyCode != KeyEvent.KEYCODE_A && keyCode != KeyEvent.KEYCODE_V) {
@@ -1213,7 +1220,7 @@ class ShellService(
 
     /**
      * 一根手指的一笔:按下、按 [times] 逐点移动、在最后一点抬起;每个事件到了它的时刻才注入(事件时间就是那一刻),
-     * App 看到的速度就是 Mika 排好的快慢。只发到 Mika 自己的屏。按下没注入成功返回 false(调用方改走别的路);
+     * App 看到的速度就是 Mika 排好的快慢。只发到可服务的屏(自有虚拟屏,或主屏模式下登记中的主屏)。按下没注入成功返回 false(调用方改走别的路);
      * 按下之后中途哪个点没注入成功也照样往下走,最后一定补发抬起,不让手指一直按着。
      */
     override fun injectStroke(displayId: Int, xs: IntArray, ys: IntArray, times: LongArray): Boolean {
@@ -1575,6 +1582,7 @@ class ShellService(
     }
 
     override fun releaseAll() {
+        mainDisplayServed = false
         asCallAudioShell { callAudio.stopAll() }
         restoreClip()
         synchronized(muted) { muted.packages() }.forEach { key ->
