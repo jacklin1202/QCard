@@ -16,6 +16,7 @@ import com.wangzan101.mika.core.tool.FakeScreen
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** 项目 3 的链行为:主模型失败自动换备援、换过去就留在备援、不该换的原样失败。 */
@@ -70,15 +71,77 @@ class ModelCallerChainTest {
     }
 
     @Test fun chainExhaustionSurfacesPrimaryError() = runTest {
-        // 整条链都失败:交出的是主模型最初的错误,不是最后一家备援的(MK-1 A-D1 第二点)。
+        // 整条链都失败:主消息是主模型最初的错误,备援的错误进记录(MK-1 第 2 批;第 1 批是直接交出主错误)。
         val mainErr = ModelError.Server(500)
         val main = Scripted("main", mainErr)
         val backup = Scripted("backup", ModelError.Server(503))
         val caller = caller(main, listOf(backup))
         var thrown: Throwable? = null
         try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
-        assertSame(mainErr, thrown)
+        val chain = thrown as ModelError.ChainFailed
+        assertSame(mainErr, chain.primary)
+        assertEquals(listOf("main", "backup"), chain.entries.map { it.first })
         assertEquals(1, backup.calls)
+    }
+
+    @Test fun mixedFailureSurfacesPrimaryWithTrail() = runTest {
+        // 主模型是可切换的错、备援是不可切换的错:照样以主模型的错领头,备援的错进记录(MK-1 第 2 批)。
+        val mainErr = ModelError.RateLimited(null)
+        val main = Scripted("main", mainErr)
+        val backup = Scripted("backup", ModelError.BadResponse("HTTP 400 wrapped"))
+        val caller = caller(main, listOf(backup))
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        val chain = thrown as ModelError.ChainFailed
+        assertSame(mainErr, chain.primary)
+        assertEquals(2, chain.entries.size)
+        assertTrue(chain.entries[1].second is ModelError.BadResponse)
+    }
+
+    @Test fun laterStepFailureStillSurfacesPrimary() = runTest {
+        // 第一步切到备援并成功,第二步备援自己失败:主模型的错靠任务级记录还在,仍由它领头(MK-1 第 2 批)。
+        val mainErr = ModelError.QuotaExceeded()
+        val main = Scripted("main", mainErr)
+        val backup = Scripted("backup", null)
+        val caller = caller(main, listOf(backup))
+        caller.ask(history, emptyList(), step = 1)
+        backup.fail = ModelError.BadResponse("HTTP 400 wrapped")
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 2) } catch (e: ModelError) { thrown = e }
+        val chain = thrown as ModelError.ChainFailed
+        assertSame(mainErr, chain.primary)
+        assertEquals(listOf("main", "backup"), chain.entries.map { it.first })
+    }
+
+    @Test fun singleModelFailureIsNotWrapped() = runTest {
+        // 没有备援、只试过一个模型:原样交出,不包 ChainFailed。
+        val err = ModelError.BadResponse("HTTP 400 wrapped")
+        val main = Scripted("main", err)
+        val caller = caller(main, emptyList())
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        assertSame(err, thrown)
+    }
+
+    @Test fun primaryBudgetErrorSurfacesOverFallbackFailure() = runTest {
+        val budget = ModelError.DailyBudgetExceeded("OpenRouter", 100, 100)
+        val main = Scripted("main", budget)
+        val backup = Scripted("backup", ModelError.BadResponse("bad"))
+        val caller = caller(main, listOf(backup), tags = listOf("OpenRouter", "APInex"))
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        assertSame(budget, thrown)
+        assertEquals(1, backup.calls)
+    }
+
+    @Test fun currentBudgetErrorWinsOverEarlierDailyBudget() = runTest {
+        val main = Scripted("main", ModelError.DailyBudgetExceeded("OpenRouter", 100, 100))
+        val taskBudget = ModelError.TaskBudgetExceeded(100, 100)
+        val backup = Scripted("backup", taskBudget)
+        val caller = caller(main, listOf(backup), tags = listOf("OpenRouter", "APInex"))
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        assertSame(taskBudget, thrown)
     }
 
     @Test fun fallbackBudgetErrorPropagatesAsItself() = runTest {

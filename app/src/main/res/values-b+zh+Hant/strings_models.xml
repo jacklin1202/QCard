@@ -67,6 +67,7 @@
     <string name="main_fallback_clear">不設定備援</string>
     <string name="main_fallback_hint">平常用主模型;它額度用完或出錯時,自動換備援模型接手。</string>
     <string name="main_fallback_failed">備援模型設定失敗</string>
+    <string name="main_fallback_is_main">這個模型就是目前主模型，不能同時當備援</string>
     <string name="role_vision_hint">讀取螢幕時把截圖給它看，介面複雜時更準。不選也能用，只靠文字讀取螢幕。</string>
     <string name="role_light_hint">判斷任務有沒有辦完、整理記憶這類小事用它。選便宜、快的更合適。</string>
     <string name="models_delete_title">刪除「%1$s」？</string>

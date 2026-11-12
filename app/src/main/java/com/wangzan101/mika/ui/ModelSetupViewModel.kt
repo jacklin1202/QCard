@@ -952,6 +952,10 @@ class ModelSetupViewModel(
         val m = model.trim()
         if (m.isEmpty() || _state.value.manualPick[providerId] == ListState.Running) return
         val p = store.provider(providerId) ?: return
+        if (store.isMainModel(providerId, m)) {
+            _state.update { it.copy(manualPick = it.manualPick + (providerId to ListState.Failed(tr(R.string.main_fallback_is_main)))) }
+            return
+        }
         _state.update { it.copy(manualPick = it.manualPick + (providerId to ListState.Running)) }
         scope.launch {
             val outcome = probeSaved(p, m)

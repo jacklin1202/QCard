@@ -511,6 +511,7 @@ class ProviderStore(
             }
         }
         _roles.value = next
+        dropMainFromFallbacks()
         prune()
         writeConfig()
         return true
@@ -538,6 +539,18 @@ class ProviderStore(
         return id
     }
 
+    /** 备援链里混进的主模型自己清掉(MK-1 D2):留着界面会显示成有效备援,运行时却跳过,两边对不上。 */
+    private fun dropMainFromFallbacks() {
+        val mainId = _roles.value.resolve(ModelRole.Main) ?: return
+        val current = _roles.value.mainFallbacks
+        if (mainId !in current) return
+        _roles.value = _roles.value.copy(mainFallbacks = current.filter { it != mainId })
+    }
+
+    /** [providerId] 下的 [model] 是不是当前主模型(备援手填时挡下用,MK-1 D1)。 */
+    fun isMainModel(providerId: String, model: String): Boolean =
+        configFor(ModelRole.Main)?.let { it.providerId == providerId && it.model == model } == true
+
     /**
      * 改主模型备援链的第 [slot] 位(项目 3):[configId] 为 null 是撤掉这一位(后面的往前补);
      * 已在链里的配置是移动到目标位(不重复占位);新配置在目标位有空位时替换、链未满时接在末尾
@@ -560,6 +573,7 @@ class ProviderStore(
         }
         if (next == current) return true
         _roles.value = _roles.value.copy(mainFallbacks = next)
+        dropMainFromFallbacks()
         prune()
         writeConfig()
         return true
@@ -1017,6 +1031,7 @@ class ProviderStore(
         repairStaleContextDefaults()
         // 指向不存在的配置的选择退回默认,没人用的配置删掉;和文件里的不一样(含刚迁移的用途)才写回
         _roles.value = _roles.value.keepOnly(_configs.value.map { it.id }.toSet())
+        dropMainFromFallbacks()
         repairUnavailableReasoningEfforts()
         prune()
         if (configFile.isFile) {

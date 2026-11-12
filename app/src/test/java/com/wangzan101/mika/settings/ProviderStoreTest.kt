@@ -123,6 +123,46 @@ class ProviderStoreTest {
         assertEquals(1, models.size)
     }
 
+    @Test fun isMainModelMatchesCurrentMain() {
+        // 手填备援时挡主模型自己,靠这个判断(MK-1 D1)。
+        val s = store()
+        val p = connected(s)
+        s.use(ModelRole.Main, p.id, "m1", none)
+        assertTrue(s.isMainModel(p.id, "m1"))
+        assertFalse(s.isMainModel(p.id, "m2"))
+        assertFalse(s.isMainModel("nope", "m1"))
+    }
+
+    @Test fun choosingFallbackAsMainClearsItFromFallbacks() {
+        // 把备援改选为主模型:它不能同时留在备援链里(MK-1 D2)。
+        val s = store()
+        val p = connected(s)
+        s.use(ModelRole.Main, p.id, "m1", none)
+        val fbId = s.ensureConfigId(p.id, "m2", none)!!
+        assertTrue(s.setMainFallback(0, fbId))
+        assertTrue(s.use(ModelRole.Main, p.id, "m2", none))
+        assertEquals(emptyList<String>(), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun storedMainDuplicateClearedOnReload() {
+        // 旧文件里主模型自己排在备援链里:重新载入时清掉,界面与实际链一致(MK-1 D2)。
+        val s = store()
+        s.saveAsMain(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        val reopened = store()
+        assertEquals(listOf("b"), reopened.roles.value.mainFallbacks)
+    }
+
+    @Test fun settingMainAsFallbackIsDroppedImmediately() {
+        // 任何路径把主模型写进备援位,存的当下就清掉,不等下次载入(审 T-1112-74a8f2 D2)。
+        val s = store()
+        s.saveAsMain(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        assertTrue(s.roles.value.mainFallbacks.isEmpty())
+    }
+
     @Test fun fallbackInheritsMainReasoningEffortWhenSupported() {
         // 主模型设了思考强度、备援写明支持同一档:建备援时带上(MK-1 B-D1)。
         val s = store()
