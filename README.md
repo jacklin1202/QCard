@@ -3,6 +3,8 @@
 > 非官方個人分叉（fork），基於 [wangzan101/Mika](https://github.com/wangzan101/Mika) v0.1.40（Apache-2.0），與原作者無關、未經原作者背書。完整的改動清單與理由見 [CHANGES.md](CHANGES.md)。
 > Unofficial personal fork of Mika v0.1.40. English version below.
 
+> **先講清楚：這支 App 下載完不會自己動。** 它不含 AI、沒有官方伺服器、沒有內建的免費額度。安裝後要先到「設定 › 模型」填入你自己的模型 API Key（或用 ChatGPT／xAI／OpenRouter 帳號登入），它才會開始工作，模型費用算你自己的（各家多有免費層）。沒有 API Key、也不想碰模型設定的話，這支 App 不適合你；它適合願意自己準備模型的人。
+
 ## 為什麼有這個版本
 
 AI agent 會看你的螢幕、替你操作 App——這種東西不該住在裝著銀行與信用卡的真手機裡。
@@ -32,7 +34,7 @@ Q卡 的立場是：**讓 agent 住在電腦的安卓模擬器裡**，真手機�
 
 ## 安裝與上手
 
-1. 從 Releases 下載 APK 安裝（applicationId 與官方版不同，可並存，設定不互通）。
+1. 從 Releases 下載 `qcard-1.0.zip`，解壓後安裝裡面的 APK（applicationId 與官方版不同，可並存，設定不互通）。
 2. 照 App 內精靈填入你自己的模型 API Key（主模型需支援看圖與工具呼叫）。可考慮的組合：主模型用免費層模型，再用備援鏈掛兩個不同供應商的模型保底。
 3. **無障礙服務**：Android 13 以上對側載 App 有「受限制的設定」——若無障礙開不起來，先到「應用程式資訊 › ⋮ › 允許受限制的設定」，再回來開啟 Q卡 的無障礙服務。
 4. **模擬器裡啟動手機助手**：用 App 內的無線配對流程，或用電腦的 adb 連上模擬器後由隨附工具啟動（與原版相同機制）。
@@ -59,6 +61,8 @@ Apache License 2.0（同原版）；保留原版 LICENSE 與 NOTICE，並標明�
 
 > Unofficial personal fork of [wangzan101/Mika](https://github.com/wangzan101/Mika) v0.1.40 (Apache-2.0). Not affiliated with or endorsed by the original author. Full change list and rationale: [CHANGES.md](CHANGES.md).
 
+> **Please note: this app does nothing on its own after install.** It contains no AI, runs no official server, and includes no free model quota. You must first enter your own model API key under Settings › Model (or sign in with a ChatGPT / xAI / OpenRouter account) before it can work; model costs are yours (most providers offer a free tier). If you have no API key and don't want to deal with model setup, this app is not for you — it is for users who can prepare their own model.
+
 ## Why this fork exists
 
 An AI agent that reads your screen and operates your apps does not belong on the phone that holds your banking and cards. QCard's stance: **the agent lives in an Android emulator on your PC** — the emulator holds only games and throwaway accounts, so the blast radius stays small, while the PC provides compute, cooling, and remote control.
@@ -81,7 +85,7 @@ Everything else matches upstream. Upstream releases are merged in periodically; 
 
 ## Install & setup
 
-1. Install the APK from Releases (different applicationId from upstream — they can coexist; settings are separate).
+1. Download `qcard-1.0.zip` from Releases, unzip it, and install the APK inside (different applicationId from upstream — they can coexist; settings are separate).
 2. Enter your own model API key in the setup wizard (the main model needs vision + tool calling). Consider a free-tier main model backed by the failover chain across two more providers.
 3. **Accessibility service**: on Android 13+, sideloaded apps hit "restricted settings" — if the accessibility toggle won't enable, first open App info › ⋮ › Allow restricted settings, then enable QCard's accessibility service.
 4. **Starting the phone helper in an emulator**: use the in-app wireless pairing flow, or connect adb from your PC to the emulator and start it with the bundled tooling (same mechanism as upstream).
