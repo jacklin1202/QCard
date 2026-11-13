@@ -42,6 +42,21 @@ Q卡 的立場是：**讓 agent 住在電腦的安卓模擬器裡**，真手機�
 
 實測環境：雷電模擬器 14（Android 14）。
 
+## 常見問題：手機操作掉線了怎麼辦
+
+症狀：Q卡 只回話、不動手，或橫幅顯示手機操作未就緒。這通常是「手機助手」子行程停掉了——它是由外部指令啟動的獨立行程，模擬器重開、系統清理或除錯開關切換都可能讓它停止（與原版相同機制）。你的設定、對話和紀錄都還在，不用重裝。
+
+在模擬器裡請不要一直等 App 內的無線配對：模擬器的虛擬網路常讓配對服務找不到（mDNS 發現失敗），會一直卡住。改走電腦端救援：
+
+1. 保持模擬器開著，先打開 Q卡 一次（讓它準備好啟動指令）。
+2. 在 Windows 開 cmd，執行（雷電安裝路徑不同請自行調整）：
+
+   `"C:\LDPlayer\LDPlayer14\adb.exe" -s emulator-5554 shell sh /sdcard/Android/data/io.github.jacklin1202.qcard/files/usb-start.sh`
+
+3. 回 Q卡 確認橫幅消失，再跑一個小任務驗證。
+
+真手機使用者：走 App 內無線配對通常可行（配對會被系統記住）；建議順手打開 設定 › 恢復與修復 的「重啟後自動恢復」與「自動開啟無線偵錯」，減少下次掉線要重配的機會。
+
 ## 支援邊界
 
 個人自用分叉，按現狀提供（as-is），**不承諾回覆 issue 或提供支援**。
@@ -92,6 +107,21 @@ Everything else matches upstream. Upstream releases are merged in periodically; 
 5. Emulator users should enable: Settings › Recovery & repair › **Main-display mode**.
 
 Tested on LDPlayer 14 (Android 14).
+
+## Troubleshooting: the phone helper stopped
+
+Symptoms: QCard replies but never acts, or the banner says phone operation is not ready. The usual cause is that the phone-helper process has stopped — it is a separate process started by an external command, and an emulator restart, a system cleanup, or toggling debugging options can stop it (same mechanism as upstream). Your settings, conversations and records are all still there; do not reinstall.
+
+In an emulator, do not wait on the in-app wireless pairing flow: the emulator's virtual network often cannot discover the pairing service (mDNS discovery fails), so it spins forever. Rescue it from the PC instead:
+
+1. Keep the emulator running, and open QCard once first (so it can prepare the start command).
+2. In Windows, open cmd and run (adjust the LDPlayer install path if yours differs):
+
+   `"C:\LDPlayer\LDPlayer14\adb.exe" -s emulator-5554 shell sh /sdcard/Android/data/io.github.jacklin1202.qcard/files/usb-start.sh`
+
+3. Go back to QCard, check that the banner has cleared, and run a small task to confirm.
+
+On a real phone, the in-app wireless pairing flow normally works (the system remembers the pairing). It also helps to enable "auto-recover after reboot" and "auto-enable wireless debugging" under Settings › Recovery & repair, so a dropped helper needs less manual re-pairing next time.
 
 ## Support
 
