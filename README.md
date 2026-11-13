@@ -1,195 +1,102 @@
-<div align="center">
+# Q卡（QCard）
 
-<img src="docs/media/logo.png" alt="Mika" width="88" />
+> 非官方個人分叉（fork），基於 [wangzan101/Mika](https://github.com/wangzan101/Mika) v0.1.40（Apache-2.0），與原作者無關、未經原作者背書。完整的改動清單與理由見 [CHANGES.md](CHANGES.md)。
+> Unofficial personal fork of Mika v0.1.40. English version below.
 
-# Mika
+## 為什麼有這個版本
 
-**An AI assistant on your phone: say what you need, and it works your apps and the web until it's done.**
+AI agent 會看你的螢幕、替你操作 App——這種東西不該住在裝著銀行與信用卡的真手機裡。
+Q卡 的立場是：**讓 agent 住在電腦的安卓模擬器裡**，真手機保持乾淨。
+模擬器裡只有遊戲與拋棄式帳號，爆炸半徑就這麼大；算力、散熱、遠端操控都由 PC 承擔。
 
-It works on a hidden background screen, so you can keep using your phone.
+**給誰用**：純電腦使用者——不想在真手機上安裝高風險 agent，但想讓 agent 在模擬器（**雷電 LDPlayer**、其他模擬器同理）裡替你做事的人。
 
-<a href="https://github.com/wangzan101/Mika/releases/latest"><img src="https://img.shields.io/badge/Download%20APK-Android%2011%2B-2ea043?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+**典型用法**：遊戲的每日登入與日常任務、簽到、簡單重複操作——開著電腦，Q卡 在模擬器裡一手包辦；人不在電腦前時，用 Telegram 從手機下任務、收結果截圖。
 
-<a href="https://github.com/wangzan101/Mika/stargazers"><img src="https://img.shields.io/github/stars/wangzan101/Mika?style=flat&logo=github&label=Star&color=1f6feb" alt="stars" /></a>
-<a href="https://github.com/wangzan101/Mika/releases"><img src="https://img.shields.io/github/downloads/wangzan101/Mika/total?label=downloads&color=2ea043" alt="downloads" /></a>
-<a href="https://github.com/wangzan101/Mika/releases/latest"><img src="https://img.shields.io/github/v/release/wangzan101/Mika?include_prereleases&label=version" alt="version" /></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
+原版 Mika 為真手機設計（在背景虛擬屏安靜做事、不占用你的屏幕）；搬到模擬器上會遇到小窗卡住看不到、做完任務就把 App 關掉等問題。Q卡 把這些改成適合模擬器的行為，而且**全部收在開關後面：預設與原版一致，用模擬器才需要打開**。
 
-<br/>
+## 與原版的差異
 
-<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/daily?language=Kotlin" alt="#1 Kotlin Repository of the Day" width="250" height="55" /></a>
-<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/weekly?language=Kotlin" alt="#1 Kotlin Repository of the Week" width="250" height="55" /></a>
-<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/daily" alt="#5 Repository of the Day" width="250" height="55" /></a>
+1. **主畫面模式（模擬器適配）**（設定 › 恢復與修復，預設關）
+   任務直接在主畫面執行，像真人一樣操作、全部看得見；使用者介入（碰螢幕、切 App）會自動暫停，處理完可繼續。
+2. **任務結束不關 App**
+   背景模式下任務做完保留螢幕與 App，不再收尾關閉；可在設定裡手動釋放。每日登入類任務不用每次重開遊戲。
+3. **模型備援鏈**
+   主模型可掛最多 2 個備援；遇到塞車（503）、限流、額度用完、認證錯誤會依規則自動切換接手，全鏈失敗時回報主模型的原始錯誤（附整條鏈的嘗試摘要）。免費模型當主力也不怕單一供應商鬧脾氣。
+4. **主畫面模式下停用內建瀏覽器工具**
+   模型只能用真實 App（例如 Chrome 本體），所有操作都看得見，不在背景偷跑。
+5. **原生 Telegram 通道**
+   用自己的 Telegram Bot 直接下任務、收結果與截圖、回答 Q卡 的提問、`/stop` 急停。綁定採一次性綁定碼，只有綁定的帳號能下指令。核准類確認基於安全**不能**在 Telegram 上按，只能回 App 處理。
 
-<br/>
+其餘功能與原版相同。跟版方式：原廠出新版後以 merge 併入，不定期更新；套件與結構刻意與上游同構，方便跟版，也方便上游收編其中任何功能。
 
-English · [简体中文](docs/readme/README.zh-CN.md) · [繁體中文](docs/readme/README.zh-Hant.md) · [日本語](docs/readme/README.ja.md) · [한국어](docs/readme/README.ko.md) · [Español](docs/readme/README.es.md)
+## 安裝與上手
 
-<br/>
+1. 從 Releases 下載 APK 安裝（applicationId 與官方版不同，可並存，設定不互通）。
+2. 照 App 內精靈填入你自己的模型 API Key（主模型需支援看圖與工具呼叫）。可考慮的組合：主模型用免費層模型，再用備援鏈掛兩個不同供應商的模型保底。
+3. **無障礙服務**：Android 13 以上對側載 App 有「受限制的設定」——若無障礙開不起來，先到「應用程式資訊 › ⋮ › 允許受限制的設定」，再回來開啟 Q卡 的無障礙服務。
+4. **模擬器裡啟動手機助手**：用 App 內的無線配對流程，或用電腦的 adb 連上模擬器後由隨附工具啟動（與原版相同機制）。
+5. 用模擬器建議打開：設定 › 恢復與修復 › **主畫面模式**。
 
-<img src="docs/media/wechat-send-side.gif" alt="From one sentence, Mika opens WeChat on its background screen, finds the contact and sends the message" width="640" />
+實測環境：雷電模擬器 14（Android 14）。
 
-<sub>"Send a message to File Transfer": Mika's chat on the left, each step on its background screen on the right (4× speed; chat list blurred)</sub>
+## 支援邊界
 
-</div>
+個人自用分叉，按現狀提供（as-is），**不承諾回覆 issue 或提供支援**。
+原版的功能問題請回原廠 repo；本版特有行為（主畫面模式、備援鏈、Telegram 通道）的問題歡迎開 issue，但回覆看時間。
 
-## Get things done with one sentence
+## 名稱由來
 
-<table>
-<tr>
-<td align="center" width="33%"><img src="docs/media/wechat-group.gif" width="230" alt="Reads through a WeChat group and summarizes today's chat" /><br/><b>"What did the group talk about today?"</b><br/><sub>Scrolls through the chat in the background, then sums it up</sub></td>
-<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" width="230" alt="Picks a charger on a shopping site and adds it to the cart" /><br/><b>"A charger under $30, rated 4.5 stars or more"</b><br/><sub>Adds the pick to the cart and stops before checkout</sub></td>
-<td align="center" width="33%"><img src="docs/media/xhs-summary.gif" width="230" alt="Summarizes a creator's recent posts" /><br/><b>"What has this creator posted lately?"</b><br/><sub>Opens the app, reads post by post, then sums it up</sub></td>
-</tr>
-</table>
+「Q卡」——Q 是 Queen，皇后替你在手機裡做事的感覺。名稱致敬 (G)I-DLE 的〈Queencard〉，與該團體／經紀公司無任何關係，未使用其圖像或標誌（圖示為自繪）。
 
-<details>
-<summary>More demos</summary>
+## 授權
 
-<table>
-<tr>
-<td align="center" width="33%"><img src="docs/media/boss-greet.gif" width="230" alt="Greets recruiters for 3 jobs on a job site" /><br/>Greets recruiters for 3 jobs on a job site</td>
-<td align="center" width="33%"><img src="docs/media/google-flights.gif" width="230" alt="Finds the cheapest nonstop flight" /><br/>Finds the cheapest nonstop from San Francisco to New York</td>
-<td align="center" width="33%"><img src="docs/media/hacker-news.gif" width="230" alt="Reads out the top 5 stories and their points" /><br/>Reads out the top 5 stories on a news site</td>
-</tr>
-<tr>
-<td align="center"><img src="docs/media/job-greet.jpg" width="230" alt="Finds jobs and greets recruiters" /><br/>Finds jobs and greets recruiters</td>
-<td align="center"><img src="docs/media/music-vip.jpg" width="230" alt="Watches ads to unlock music perks" /><br/>Watches ads to unlock music perks</td>
-<td align="center"><img src="docs/media/food-order.jpg" width="230" alt="Orders takeout with stacked discounts and asks you before paying" /><br/>Orders takeout with stacked discounts, asks before paying</td>
-</tr>
-</table>
+Apache License 2.0（同原版）；保留原版 LICENSE 與 NOTICE，並標明本版修改之處（見 CHANGES.md 與各 commit）。
 
-</details>
+---
 
-<sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Mika isn't tied to them; it works with any app or website on your phone.</sub>
+# QCard — English
 
-## Why Mika
+> Unofficial personal fork of [wangzan101/Mika](https://github.com/wangzan101/Mika) v0.1.40 (Apache-2.0). Not affiliated with or endorsed by the original author. Full change list and rationale: [CHANGES.md](CHANGES.md).
 
-| | |
-|---|---|
-| 📱 **Leaves your screen alone** | Opens apps, taps, types and scrolls on a separate background screen while you use your phone as usual; tap the small live view whenever you want to watch |
-| 🧩 **Works with any app** | Looks at the screen and finds buttons the way a person does: no app APIs, no per-app integration |
-| 🌐 **Call it from any web page** | In the built-in browser, say what you want on the page you're reading and it works right there; touch the page and it stops |
-| 🧠 **Gets better with use** | Remembers the preferences you tell it, and turns tasks it finishes into skills so next time is faster and steadier |
-| 🔒 **Your data stays on your phone** | There is no Mika server; use your own model API key, or sign in with a ChatGPT, xAI or OpenRouter account |
-| 🆓 **Open source and free** | Apache-2.0, all code public |
+## Why this fork exists
 
-## Get started in three steps
+An AI agent that reads your screen and operates your apps does not belong on the phone that holds your banking and cards. QCard's stance: **the agent lives in an Android emulator on your PC** — the emulator holds only games and throwaway accounts, so the blast radius stays small, while the PC provides compute, cooling, and remote control.
 
-1. **Install**: download the APK from [Releases](https://github.com/wangzan101/Mika/releases/latest).
-2. **Connect a model**: in Settings › Model, pick a provider and enter an API key, or just sign in with an account ([models and sign-in](docs/models.en.md)).
-3. **To operate phone apps**: follow the "Set up phone control" wizard in Settings and pair wireless debugging on the phone once ([setup guide](docs/setup-guide.en.md)). Skip this if you only want chat, web and files.
+**Who it's for**: PC-centric users who don't want a high-risk agent on their real phone, but do want one working inside an emulator (**LDPlayer** in our testing; other emulators should behave the same).
 
-Then try saying: "Set alarms for 9:40 and 10:00 tomorrow morning" or "Check the weather at 8 every morning and tell me only if it will rain".
+**Typical use**: daily game logins and routine tasks, check-ins, simple repetitive chores — QCard handles them end-to-end in the emulator, and when you're away from the PC you can send tasks and receive results/screenshots over Telegram.
 
-> 💡 Have a computer handy? Send this to the AI agent on it and it will set everything up for you:<br/>
-> `Follow https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.en.md to install Mika on the Android phone connected over USB.`
+Upstream Mika is designed for physical phones (working quietly on a background virtual display). On an emulator that design causes real friction — an invisible, sometimes stuck virtual screen, and apps being closed when a task ends. QCard adapts those behaviors for emulator use, **all behind switches: defaults match upstream; enable them only if you run an emulator.**
 
-## What it can do
+## What differs from upstream
 
-| | |
-|---|---|
-| **Operate apps** | Reads long lists and chat histories, taps and types, shares text into apps; hands logins, verification codes and payments to you |
-| **Browse the web** | A built-in desktop-class browser that keeps you signed in, reads pages, downloads and uploads; paces itself and hands block pages to you |
-| **Your current screen** | Double-tap the floating capsule to send the screen you're looking at: "how should I reply?", "note this down" |
-| **Schedules and conditions** | "Remind me at 9 tomorrow", "do this every Friday"; runs on time in the original conversation |
-| **Jump in or stop anytime** | Keep talking while a task runs to add or correct things (long-press to withdraw or edit one Mika hasn't picked up yet); after a stop it reports where it got to, and "continue" picks up from there |
-| **Hold to talk** | Hold the chat input to speak and edit the words before sending; long-press the floating capsule to speak and release to send. Uses the phone’s built-in speech recognition, or a provider’s speech model if it has none |
-| **Files and computing** | A Linux sandbox per conversation runs Python, Node and shell on the files you send (arm64) |
-| **From your computer** | AI tools on your computer can hand Mika tasks through CLI + Skill or MCP ([use Mika from a computer](docs/computer.en.md)) |
+1. **Main-display mode** (Settings › Recovery & repair, off by default) — tasks run visibly on the main screen like a human operating the phone; if you intervene (touch, switch apps) the task auto-pauses and can resume afterwards.
+2. **Tasks no longer close apps** — in background mode the display and its apps survive task completion; release them manually in Settings. Daily-login routines don't restart the game every time.
+3. **Model failover chain** — attach up to 2 fallback models to the main model. Congestion (503), rate limits, quota exhaustion, and auth errors switch over automatically by error class; if the whole chain fails you get the main model's original error plus a summary of every attempt. Free-tier models become viable primaries.
+4. **Built-in browser withheld in main-display mode** — the model must use real apps (e.g. Chrome itself); nothing runs invisibly in the background.
+5. **Native Telegram channel** — task the agent from your own Telegram bot: send tasks, receive results and screenshots, answer its questions, `/stop` to halt. Pairing uses a one-time binding code; only the bound account can issue tasks. Approval-type confirmations **cannot** be tapped through Telegram — they require the app, by design.
 
-By default Mika runs in **Ask mode**: it checks with you only before spending money (placing orders, paying) and just does everything else. You can switch to **Autonomous mode** instead. See [Ask and Autonomous](docs/modes.en.md).
+Everything else matches upstream. Upstream releases are merged in periodically; package and structure intentionally stay isomorphic to upstream so merging stays cheap and any feature here can be cherry-picked upstream.
 
-For how each of these works and the finer details, see [features in detail](docs/features.en.md).
+## Install & setup
 
-<details>
-<summary>Apps and websites with built-in usage knowledge (anything not listed still works)</summary>
+1. Install the APK from Releases (different applicationId from upstream — they can coexist; settings are separate).
+2. Enter your own model API key in the setup wizard (the main model needs vision + tool calling). Consider a free-tier main model backed by the failover chain across two more providers.
+3. **Accessibility service**: on Android 13+, sideloaded apps hit "restricted settings" — if the accessibility toggle won't enable, first open App info › ⋮ › Allow restricted settings, then enable QCard's accessibility service.
+4. **Starting the phone helper in an emulator**: use the in-app wireless pairing flow, or connect adb from your PC to the emulator and start it with the bundled tooling (same mechanism as upstream).
+5. Emulator users should enable: Settings › Recovery & repair › **Main-display mode**.
 
-The names are shown as they appear in the knowledge files.
+Tested on LDPlayer 14 (Android 14).
 
-<!-- generated:knowledge:start -->
-<!-- Generated by ./gradlew updateReadme; do not edit by hand -->
-| Category | Built in |
-|---|---|
-| **Apps** | 支付宝, Android 设置, 百家号, 哔哩哔哩, BOSS直聘, Chrome, 得到, 抖音, 飞书, Gmail, 京东, 即刻, 快手, 领英, 美团, 拼多多, QQ邮箱, 淘宝, Telegram, 今日头条, Uber, Uber Eats, 微信, 微博, WhatsApp, X, 闲鱼, 小红书, 知乎 |
-| **Websites** | Amazon, 哔哩哔哩, Google Calendar, 豆瓣, 抖音, GitHub, Instagram, Gmail, Google Maps, Telegram, 百度贴吧, 微博, 搜狗微信, WhatsApp, 小红书, 小宇宙, YouTube, 知乎, BOSS直聘 |
-| **How-to skills** | 改 Mika 自己的设置, 把内容整理成文字, 处理 PDF 文档, 查清一件事, 消息与邮件, 写技能 |
-<!-- generated:knowledge:end -->
+## Support
 
-</details>
+Personal fork, provided as-is; **no promise of issue replies or support**. Upstream behavior questions belong to the upstream repo; issues specific to this fork's features (main-display mode, failover chain, Telegram channel) are welcome but answered when time permits.
 
-<details>
-<summary>Supported model providers</summary>
+## The name
 
-<!-- generated:providers:start -->
-<!-- Generated by ./gradlew updateReadme; do not edit by hand -->
-Presets for DeepSeek, 通义千问, Kimi, 智谱, 智谱 Coding Plan, 硅基流动, 火山方舟, MiniMax, 阶跃星辰, 腾讯混元, 百度千帆, OpenRouter, Requesty, OpenCode Go, Anthropic, Gemini, OpenAI, xAI, Mistral, Groq, Ollama, LM Studio and more; for any other provider pick Custom (自定义), which takes any OpenAI-compatible, Anthropic, Gemini or OpenAI Responses endpoint.
-<!-- generated:providers:end -->
-
-You can also skip the key and sign in with a ChatGPT (Plus / Pro), xAI / Grok or OpenRouter account. Steps for adding a model, and what to know about each sign-in, are in [models and sign-in](docs/models.en.md).
-
-</details>
-
-## Which phones
-
-| | Requirement |
-|---|---|
-| Chat, web, files | Android 11 or later |
-| Operating phone apps | Android 12 or later; **Android 14+ recommended** (the background screen has its own focus, so it doesn't get in the way of your typing on the main screen) |
-| Linux sandbox | arm64 devices |
-
-Not sure your phone is up to it? Run Settings › Recovery & repair › **Compatibility self-check**: 12 checks in about a minute, and you can [send us the results](https://github.com/wangzan101/Mika/issues/new?template=device-report.yml) in one tap.
-
-## Privacy & safety
-
-- **There is no Mika server**: what you say and what's on your screen go only to the model provider you set up.
-- API keys and memories are stored encrypted on the phone; conversations and run records stay on the device; update checks only contact GitHub.
-- Operating third-party apps and websites automatically may break their terms of service, so use your own judgment. For anything important, use Ask mode and check the results. See the [disclaimer](docs/disclaimer.en.md).
-
-<details>
-<summary><b>FAQ</b></summary>
-
-**Wireless debugging turned itself off?** Android turns it off when you change Wi-Fi or restart. With your permission, Mika turns it back on by itself; if it still can't connect, go back to "Set up phone control" and pair again.
-
-**Can't find wireless debugging on my phone?** Some phone systems leave it out. You can start the phone helper from a computer over USB instead; see the [setup guide](docs/setup-guide.en.md).
-
-**Some screens can't be read or captured?** Pages like payments and password entry block screenshots, so Mika asks you to take over there.
-
-**Can I use a model running on my own computer?** Yes: pick "Custom" as the provider and enter its address on your local network.
-
-**Is the app in English?** Yes. The app UI comes in English, Arabic, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian and Indonesian, follows your system language, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Mika in English.
-
-**Where do updates come from?** Only from this repository's [Releases](https://github.com/wangzan101/Mika/releases); you can also upgrade in the app from About › Check for updates.
-
-More answers are in the [FAQ](docs/faq.en.md).
-
-</details>
-
-## Community & contributing
-
-- **Docs**: all docs and a suggested reading order are in the [docs index](docs/README.en.md)
-- **Community**: join the [X group chat](https://x.com/i/chat/group_join/g2116926829198246025/48B52j5svL); to reach the author on WeChat, scan the QR code in the app under About › Contact the author (mention Mika in your request)
-- **Follow the author**: X [@wangzan101](https://x.com/wangzan101)
-- **Report a problem**: [open an issue](https://github.com/wangzan101/Mika/issues/new/choose); About › Send feedback in the app can attach diagnostics
-- **Contribute**: add usage knowledge for an app or website (plain text, no code needed), or contribute code; see the [contributing guide](.github/CONTRIBUTING.md)
-
-## Star History
-
-<a href="https://star-history.com/#wangzan101/Mika&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&theme=dark&v=20261110-2017" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&v=20261110-2017" width="600" />
-  </picture>
-</a>
-
-## Contributors
-
-Thanks to everyone who has helped build Mika:
-
-<a href="https://github.com/wangzan101/Mika/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=wangzan101/Mika&max=100&columns=12" alt="Contributors" />
-</a>
+"Q卡" (QCard) — Q for Queen: a queen handling things in your phone for you. A nod to (G)I-DLE's "Queencard"; no affiliation, and no imagery or marks of the group or its agency are used (the icon is self-drawn).
 
 ## License
 
-[Apache-2.0](LICENSE) · [NOTICE](NOTICE) · [Third-party components](licenses/THIRD_PARTY_NOTICES.md)
+Apache License 2.0, same as upstream. Upstream LICENSE and NOTICE are preserved; this fork's modifications are documented in CHANGES.md and the commit history.
