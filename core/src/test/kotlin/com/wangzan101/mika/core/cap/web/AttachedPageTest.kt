@@ -11,7 +11,7 @@ class AttachedPageTest {
         val text = AttachedPage.compose(AttachedPage.Page("https://shop.example.com/s?k=耳机", "耳机 - 搜索", "B2 Pro\n¥649"), "  这页里挑一个  ")
         assertEquals(
             """
-            [Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]
+            [Web page I'm viewing in Q卡's browser. It is attached to this task as your current web tab.]
             Title: 耳机 - 搜索
             URL: https://shop.example.com/s?k=耳机
             Selected text:
@@ -26,6 +26,15 @@ class AttachedPageTest {
         assertTrue(AttachedPage.has(text))
     }
 
+    @Test fun parsesLegacyMikaHeader() {
+        val text = "[Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]\n" +
+            "URL: https://a.example/\n[End of page]\n\nlegacy words"
+        assertTrue(AttachedPage.has(text))
+        val p = AttachedPage.parse(text)
+        assertEquals(AttachedPage.Page("https://a.example/", "", null), p.page)
+        assertEquals("legacy words", p.words)
+    }
+
     @Test fun parseRoundTrips() {
         val page = AttachedPage.Page("https://news.example.org/a/1", "A title", "line one\n\nline three")
         val p = AttachedPage.parse(AttachedPage.compose(page, "summarize\nplease"))
@@ -36,7 +45,7 @@ class AttachedPageTest {
 
     @Test fun noTitleNoSelectionNoWords() {
         val text = AttachedPage.compose(AttachedPage.Page("https://a.example/", "  "), "")
-        assertEquals("[Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]\nURL: https://a.example/\n[End of page]", text)
+        assertEquals("[Web page I'm viewing in Q卡's browser. It is attached to this task as your current web tab.]\nURL: https://a.example/\n[End of page]", text)
         val p = AttachedPage.parse(text)
         assertEquals(AttachedPage.Page("https://a.example/", "", null), p.page)
         assertEquals("", p.words)

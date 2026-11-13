@@ -1,10 +1,10 @@
 package com.wangzan101.mika.core.cap.web
 
 /**
- * 用户在 Mika 的浏览器里、对着正看的那一页问 Mika 时,这句话怎么写:最前面一段说明是哪一页(固定的英文,模型一看就懂;
+ * 用户在 Q卡的浏览器里、对着正看的那一页问 Q卡时,这句话怎么写:最前面一段说明是哪一页(固定的英文,模型一看就懂;
  * 对话页、卡片认这一段),空一行后是用户这次说的话(原样)。例如
  * ```
- * [Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]
+ * [Web page I'm viewing in Q卡's browser. It is attached to this task as your current web tab.]
  * Title: 降噪耳机 - 搜索结果
  * URL: https://shop.example.com/s?k=降噪耳机
  * Selected text:
@@ -18,7 +18,10 @@ package com.wangzan101.mika.core.cap.web
  * 选中的字每行以「| 」开头,和说明的其余几行分得开;页面标题、选中的字都会截短。
  */
 object AttachedPage {
-    const val HEADER = "[Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]"
+    const val HEADER = "[Web page I'm viewing in Q卡's browser. It is attached to this task as your current web tab.]"
+
+    /** 改名前的旧说明头:只认不写,让旧对话里的页面说明照常拆得开。 */
+    const val LEGACY_HEADER = "[Web page I'm viewing in Mika's browser. It is attached to this task as your current web tab.]"
     const val END = "[End of page]"
     private const val TITLE = "Title: "
     private const val URL = "URL: "
@@ -57,7 +60,8 @@ object AttachedPage {
 
     fun parse(text: String): Parsed {
         val lines = text.lines()
-        if (lines.firstOrNull()?.trim() != HEADER) return Parsed(null, text)
+        val first = lines.firstOrNull()?.trim()
+        if (first != HEADER && first != LEGACY_HEADER) return Parsed(null, text)
         val end = lines.indexOfFirst { it.trim() == END }
         if (end < 0) return Parsed(null, text)
         var title = ""
@@ -80,7 +84,7 @@ object AttachedPage {
     fun words(text: String): String = parse(text).words
 
     /** 这句话带着页面说明。 */
-    fun has(text: String): Boolean = text.lineSequence().firstOrNull()?.trim() == HEADER
+    fun has(text: String): Boolean = text.lineSequence().firstOrNull()?.trim().let { it == HEADER || it == LEGACY_HEADER }
 
     /** 选中的字:去掉首尾空白,每行去掉行尾空白,超过 [MAX_SELECTION] 截断加「…」;空的为 null。说明的结束行不会出现在里面。 */
     fun clip(selection: String?): String? {
