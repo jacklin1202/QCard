@@ -65,7 +65,7 @@ internal object MikaOpenScreen : SelfTool {
         "mika_open_screen",
         Prompts.tool("mika_open_screen"),
         mapOf(
-            "screen" to str("Which Mika screen to open.", SelfScreen.entries.map { it.wire }),
+            "screen" to str("Which Q卡 screen to open.", SelfScreen.entries.map { it.wire }),
             "note" to str("Optional short reason shown to the user, in the user's language."),
         ),
         listOf("screen"),
@@ -119,7 +119,7 @@ internal object MikaNotify : SelfTool {
         mapOf(
             "title" to str("Short notification title, in the user's language."),
             "body" to str("What happened, in one or two sentences, in the user's language."),
-            "screen" to str("Optional Mika screen to open from the notification.", SelfScreen.entries.map { it.wire }),
+            "screen" to str("Optional Q卡 screen to open from the notification.", SelfScreen.entries.map { it.wire }),
         ),
         listOf("title", "body"),
     )

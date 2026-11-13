@@ -209,7 +209,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
         FdSysException.Kind.EXISTS -> SandboxError(FILE_EXISTS, "A file with this name already exists.", recoverable = true)
         FdSysException.Kind.NOT_DIR -> SandboxError(FILE_NOT_FOUND, "A folder on this path is not a folder.", recoverable = true)
         FdSysException.Kind.LINK ->
-            if (dirStep) SandboxError(NOT_A_FILE, "A folder on this path is a link; Mika's file tools do not follow links. Use the real path.", recoverable = true)
+            if (dirStep) SandboxError(NOT_A_FILE, "A folder on this path is a link; Q卡's file tools do not follow links. Use the real path.", recoverable = true)
             else notAFile()
         FdSysException.Kind.NOT_FILE -> notAFile()
     }
