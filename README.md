@@ -48,6 +48,10 @@ Q卡 的立場是：**讓 agent 住在電腦的安卓模擬器裡**，真手機�
 
 在模擬器裡請不要一直等 App 內的無線配對：模擬器的虛擬網路常讓配對服務找不到（mDNS 發現失敗），會一直卡住。改走電腦端救援：
 
+**一鍵救援（Windows）**：保持模擬器開著，下載 Release 附的 `QCard-Reconnect.bat`（或 repo 的 `tools/QCard-Reconnect.bat`），雙擊它。它會自動找到 adb 和裝置、打開 Q卡、啟動手機助手並確認結果，你不用打任何指令。
+
+一鍵檔走不通時，改用手動指令：
+
 1. 保持模擬器開著，先打開 Q卡 一次（讓它準備好啟動指令）。
 2. 在 Windows 開 cmd，執行（雷電安裝路徑不同請自行調整）：
 
@@ -113,6 +117,10 @@ Tested on LDPlayer 14 (Android 14).
 Symptoms: QCard replies but never acts, or the banner says phone operation is not ready. The usual cause is that the phone-helper process has stopped — it is a separate process started by an external command, and an emulator restart, a system cleanup, or toggling debugging options can stop it (same mechanism as upstream). Your settings, conversations and records are all still there; do not reinstall.
 
 In an emulator, do not wait on the in-app wireless pairing flow: the emulator's virtual network often cannot discover the pairing service (mDNS discovery fails), so it spins forever. Rescue it from the PC instead:
+
+**One-click rescue (Windows)**: keep the emulator running, download `QCard-Reconnect.bat` from the Release assets (or `tools/QCard-Reconnect.bat` in this repo), and double-click it. It finds adb and your device automatically, opens QCard, starts the phone helper, and confirms the result — no commands to type.
+
+If the one-click file does not work for you, use the manual command:
 
 1. Keep the emulator running, and open QCard once first (so it can prepare the start command).
 2. In Windows, open cmd and run (adjust the LDPlayer install path if yours differs):
