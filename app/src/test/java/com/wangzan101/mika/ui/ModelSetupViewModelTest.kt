@@ -22,6 +22,7 @@ import com.wangzan101.mika.settings.ProviderConfig
 import com.wangzan101.mika.settings.ProviderPresets
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.settings.RoleChoice
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -1040,5 +1041,109 @@ class ModelSetupViewModelTest {
         assertEquals("列过的列表留着", listOf("deepseek-chat", "deepseek-reasoner", "deepseek-coder"), after.models!!.map { it.id })
         assertEquals(setOf("deepseek-chat"), after.verifiedModels)
         assertFalse("核实过的模型让这家不算没测过", after.savedUntested)
+    }
+
+    private val geminiUrl = "https://generativelanguage.googleapis.com"
+
+    @Test fun googleStartWithGoodKeyConnectsGeminiAndSetsFreeModelAsMain() = runTest {
+        listing[geminiUrl] = ModelListResult.Ok(
+            listOf(ListedModel("gemini-3.5-flash-lite"), ListedModel("gemini-3.5-flash")),
+        )
+        val store = store()
+        val vm = vm(store)
+        runCurrent()
+        vm.setGoogleKey("AIza-test")
+        vm.startWithGoogle()
+        runCurrent()
+        assertEquals(Triple(ProviderConfig.Kind.Gemini, geminiUrl, "AIza-test"), listCalls.single())
+        val p = store.providers.value.single()
+        assertEquals("Gemini", p.name)
+        assertEquals("AIza-test", store.providerKey(p.id))
+        val main = store.configFor(ModelRole.Main)
+        assertEquals("gemini-3.5-flash-lite", main?.model)
+        assertEquals(p.id, main?.providerId)
+        val s = vm.state.value
+        assertFalse(s.googleStart.busy)
+        assertNull(s.googleStart.error)
+        assertEquals("", s.googleStart.key)
+        assertTrue(s.canNext)
+    }
+
+    @Test fun googleStartWithBadKeySavesNothingAndSaysWhy() = runTest {
+        listing[geminiUrl] = ModelListResult.Failed(ListFailure.Auth)
+        val store = store()
+        val vm = vm(store)
+        runCurrent()
+        vm.setGoogleKey("AIza-bad")
+        vm.startWithGoogle()
+        runCurrent()
+        assertTrue(store.providers.value.isEmpty())
+        assertTrue(store.list().isEmpty())
+        val s = vm.state.value
+        assertFalse(s.googleStart.busy)
+        assertTrue(s.googleStart.error != null)
+        assertFalse(s.canNext)
+    }
+
+    @Test fun googleStartWithModelThatWillNotCallToolsSavesNothing() = runTest {
+        listing[geminiUrl] = ModelListResult.Ok(listOf(ListedModel("gemini-3.5-flash-lite")))
+        reply = { ModelReply(listOf(Part.Text("It is noon.")), StopReason.EndTurn, null) }
+        val store = store()
+        val vm = vm(store)
+        runCurrent()
+        vm.setGoogleKey("AIza-test")
+        vm.startWithGoogle()
+        runCurrent()
+        assertTrue(store.providers.value.isEmpty())
+        assertTrue(vm.state.value.googleStart.error != null)
+        assertFalse(vm.state.value.canNext)
+    }
+
+    /** Google 驗證進行中去改新增表單、關表單(都會 cancel 表單的 testJob),不許把 Google 流程一起取消掉。 */
+    @Test fun googleStartSurvivesFormEditsWhileRunning() = runTest {
+        listing[geminiUrl] = ModelListResult.Ok(listOf(ListedModel("gemini-3.5-flash-lite")))
+        val gate = CompletableDeferred<ModelReply>()
+        reply = { gate.await() }
+        val store = store()
+        val vm = vm(store)
+        runCurrent()
+        vm.setGoogleKey("AIza-test")
+        vm.startWithGoogle()
+        runCurrent()
+        assertTrue("驗證中", vm.state.value.googleStart.busy)
+        vm.setApiKey("sk-other")
+        vm.setBaseUrl("https://example.com/v1")
+        vm.closeForm()
+        gate.complete(ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null))
+        runCurrent()
+        val p = store.providers.value.single()
+        assertEquals("Gemini", p.name)
+        assertEquals("gemini-3.5-flash-lite", store.configFor(ModelRole.Main)?.model)
+        assertFalse(vm.state.value.googleStart.busy)
+        assertNull(vm.state.value.googleStart.error)
+    }
+
+    /** 試呼叫失敗要分流:認證錯誤才說 Key 不能用;模型沒開通就說沒開通,不誤導使用者去查 Key。 */
+    @Test fun googleStartProbeFailureBlamesTheKeyOnlyForAuthErrors() = runTest {
+        listing[geminiUrl] = ModelListResult.Ok(listOf(ListedModel("gemini-3.5-flash-lite")))
+        reply = { throw ModelError.ModelNotAvailable("gemini-3.5-flash-lite", "The product is not activated.") }
+        val store = store()
+        val vm = vm(store)
+        runCurrent()
+        vm.setGoogleKey("AIza-test")
+        vm.startWithGoogle()
+        runCurrent()
+        assertTrue(store.providers.value.isEmpty())
+        val notAvailable = vm.state.value.googleStart.error
+        assertTrue(notAvailable != null)
+        assertFalse("不許怪 Key:$notAvailable", notAvailable!!.contains("密钥不能用"))
+        assertTrue(notAvailable.contains("没开通"))
+        reply = { throw ModelError.Auth() }
+        vm.setGoogleKey("AIza-bad")
+        vm.startWithGoogle()
+        runCurrent()
+        val auth = vm.state.value.googleStart.error
+        assertTrue("認證錯誤才說 Key 不能用:$auth", auth != null && auth.contains("密钥不能用"))
+        assertTrue(store.providers.value.isEmpty())
     }
 }

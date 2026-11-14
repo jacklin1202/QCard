@@ -1,7 +1,9 @@
 package com.wangzan101.mika.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OnboardingTest {
@@ -30,6 +32,13 @@ class OnboardingTest {
     @Test fun phoneStepSkippedWhenReadyOrSeen() {
         assertNull(Onboarding.next(OnboardingStep.Model, inputs(phoneNeeded = false)))
         assertNull(Onboarding.next(OnboardingStep.Model, inputs(phoneSeen = true)))
+    }
+
+    @Test fun googleStartCardShowsOnlyWithoutMainModelAndNotDismissed() {
+        assertTrue(googleStartVisible(hasNoMainModel = true, dismissed = false))
+        assertFalse(googleStartVisible(hasNoMainModel = false, dismissed = false))
+        assertFalse(googleStartVisible(hasNoMainModel = true, dismissed = true))
+        assertFalse(googleStartVisible(hasNoMainModel = false, dismissed = true))
     }
 
     @Test fun dotsFollowSteps() {

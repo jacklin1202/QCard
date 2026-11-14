@@ -239,6 +239,7 @@ fun ModelSetupScreen(
                     openForm = vm::openForm, closeForm = vm::closeForm,
                     openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, pickFallback = { pickingFallback = it }, promoteFallback = vm::promoteFallback, moveFallback = vm::moveFallback, next = onDone, openSpeech = onOpenSpeech,
                     openUsage = onOpenUsage,
+                    setGoogleKey = vm::setGoogleKey, startWithGoogle = vm::startWithGoogle,
                     openSignIn = { signInSheet = it },
                     setReasoningEffort = vm::setReasoningEffort,
                     setModelContext = vm::setModelContext,
@@ -298,6 +299,9 @@ class ModelSetupActions(
     /** 打开 Token 用量;为 null 时不显示入口(上手流程)。 */
     val openUsage: (() -> Unit)? = null,
     val next: () -> Unit = {},
+    /** 「用 Google 免費開始」卡片:改貼上的 Key、開始驗證。 */
+    val setGoogleKey: (String) -> Unit = {},
+    val startWithGoogle: () -> Unit = {},
     /** 打开一家账号登录的说明面板。 */
     val openSignIn: (SignInKind) -> Unit = {},
     val setReasoningEffort: (ModelRole, String?) -> Unit = { _, _ -> },
@@ -311,6 +315,9 @@ class ModelSetupActions(
 @Composable
 fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetupActions, onBack: () -> Unit) {
     val c = MikaTheme.colors
+    val context = LocalContext.current
+    val onboardingState = remember { OnboardingState(context) }
+    var googleDismissed by remember { mutableStateOf(onboardingState.googleStartDismissed()) }
     // 表单收起(测试通过存好了,或取消)后页面上没有要打字的地方,顺手收起键盘
     val focus = LocalFocusManager.current
     LaunchedEffect(ui.showForm) { if (!ui.showForm) focus.clearFocus() }
@@ -326,6 +333,12 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
                     )
                 }
                 // 上手时先连服务商再选模型;设置里先看用途
+                if (googleStartVisible(ui.roles.main == null, googleDismissed)) {
+                    GoogleStartCard(ui.googleStart, actions) {
+                        onboardingState.markGoogleStartDismissed()
+                        googleDismissed = true
+                    }
+                }
                 if (onboarding) {
                     ProvidersSection(ui, actions)
                     RolesSection(ui, onPick, actions.setReasoningEffort, null)
@@ -350,6 +363,55 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
             }
         }
     }
+}
+
+/** Google AI Studio 申請金鑰的頁面。 */
+private const val GOOGLE_KEY_URL = "https://aistudio.google.com/apikey"
+
+/**
+ * 「用 Google 免費 API 開始」:還沒有主模型、也沒按過略過時出現在頁面最上面。
+ * 開申請頁 → 貼 Key → 一鍵驗證並設好主模型;「略過」給已經有自己 API 的人,按過就不再出現。
+ */
+@Composable
+private fun GoogleStartCard(state: GoogleStartUi, actions: ModelSetupActions, onDismiss: () -> Unit) {
+    val c = MikaTheme.colors
+    val context = LocalContext.current
+    var showKey by remember { mutableStateOf(false) }
+    GroupLabel(ModelSetupCopy.GOOGLE_TITLE)
+    GroupCard(Modifier.testTag("google-start-card")) {
+        Text(
+            ModelSetupCopy.GOOGLE_BODY, Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp),
+            fontSize = 13.5.sp, lineHeight = 20.sp, color = c.ink2,
+        )
+        InputRow(
+            ModelSetupCopy.API_KEY, state.key, actions.setGoogleKey, ModelSetupCopy.GOOGLE_KEY_HINT,
+            keyboard = KeyboardType.Password, secret = !showKey, modifier = Modifier.testTag("google-start-key"),
+        ) {
+            Text(
+                if (showKey) stringResource(R.string.hide) else stringResource(R.string.show),
+                Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent,
+            )
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        MikaButton(
+            if (state.busy) ModelSetupCopy.GOOGLE_BUSY else ModelSetupCopy.GOOGLE_GO, actions.startWithGoogle,
+            Modifier.weight(1f).testTag("google-start-go"), enabled = state.key.isNotBlank() && !state.busy,
+        )
+        Text(
+            ModelSetupCopy.GOOGLE_OPEN,
+            Modifier.clickable {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GOOGLE_KEY_URL))) }
+            }.padding(horizontal = 12.dp, vertical = 10.dp).testTag("google-start-open"),
+            fontSize = 13.5.sp, fontWeight = FontWeight.Medium, color = c.accent,
+        )
+        Text(
+            ModelSetupCopy.GOOGLE_SKIP,
+            Modifier.clickable(onClick = onDismiss).padding(horizontal = 8.dp, vertical = 10.dp).testTag("google-start-skip"),
+            fontSize = 13.5.sp, color = c.ink2,
+        )
+    }
+    state.error?.let { FooterNote(it, Modifier.testTag("google-start-error"), color = c.warn) }
 }
 
 /** 服务商:每家一行(写明在给哪些用途干活),加「添加服务商」;没有服务商或点了添加时,表单就摊在这里。 */
@@ -719,6 +781,13 @@ object ModelSetupCopy {
     val TITLE: String get() = tr(R.string.model_setup_title)
     val LEAD: String get() = tr(R.string.model_setup_lead)
     val ONBOARDING_NOTE: String get() = tr(R.string.model_setup_onboarding_note)
+    val GOOGLE_TITLE: String get() = tr(R.string.google_start_title)
+    val GOOGLE_BODY: String get() = tr(R.string.google_start_body)
+    val GOOGLE_OPEN: String get() = tr(R.string.google_start_open)
+    val GOOGLE_KEY_HINT: String get() = tr(R.string.google_start_key_hint)
+    val GOOGLE_GO: String get() = tr(R.string.google_start_go)
+    val GOOGLE_BUSY: String get() = tr(R.string.google_start_busy)
+    val GOOGLE_SKIP: String get() = tr(R.string.google_start_skip)
     val CANCEL: String get() = tr(R.string.cancel)
     val KIND: String get() = tr(R.string.model_kind)
     val BASE_URL: String get() = tr(R.string.model_base_url)

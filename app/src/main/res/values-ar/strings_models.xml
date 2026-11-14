@@ -222,4 +222,13 @@
     <string name="main_fallback_move_down">Move down</string>
     <string name="main_fallback_failed">Could not set the fallback model</string>
     <string name="main_fallback_is_main">This is the current main model, so it cannot also be its fallback</string>
+    <string name="google_start_title">Start free with Google</string>
+    <string name="google_start_body">No API yet? Get a free key from Google AI Studio with your Google account, paste it here, and QCard sets itself up with a free Gemini model. The free tier has daily limits, and Google may use free-tier content to improve its products.</string>
+    <string name="google_start_open">Get a free key</string>
+    <string name="google_start_key_hint">Paste your Google AI key</string>
+    <string name="google_start_go">Start (free)</string>
+    <string name="google_start_busy">Checking your key…</string>
+    <string name="google_start_skip">Skip</string>
+    <string name="google_start_no_tools">%1$s answered but did not call the tool, so it cannot run tasks. Nothing was saved.</string>
+    <string name="google_start_failed">That key did not work (%1$s). Nothing was saved — check the key and try again.</string>
 </resources>

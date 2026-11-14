@@ -186,6 +186,13 @@ data class AddForm(
     }
 }
 
+/** 「用 Google 免費 API 開始」的進度:貼上的 Key、是否正在驗證、失敗原因(用現有說法)。 */
+data class GoogleStartUi(
+    val key: String = "",
+    val busy: Boolean = false,
+    val error: String? = null,
+)
+
 /**
  * 配置模型(上手时)和设置 › 模型共用的全部状态:已连接的服务商、添加服务商表单、三个用途。
  * [providers]、[configs]、[roles] 是 [ProviderStore] 的快照,[keyed] 是存了 Key 的服务商 id;
@@ -226,6 +233,8 @@ data class ModelSetupUi(
      * 两个来源:试调用的模型一个都没通过,或用户跳过测试直接存下。
      */
     val pickToProbe: String? = null,
+    /** 「用 Google 免費 API 開始」卡片的狀態。 */
+    val googleStart: GoogleStartUi = GoogleStartUi(),
     /** 选择页里手填模型名后试调用的进度(按服务商 id)。 */
     val manualPick: Map<String, ListState> = emptyMap(),
     /** 服务商页「重新测试」的进度(按服务商 id)。 */
@@ -325,6 +334,8 @@ class ModelSetupViewModel(
     val speechProbe: StateFlow<Map<String, String>> = _speechProbe.asStateFlow()
 
     private var testJob: Job? = null
+    /** 「用 Google 免費開始」自己的 Job:跟表單的 [testJob] 分開,改表單、關表單都不許取消它(反之亦然)。 */
+    private var googleJob: Job? = null
     private val refreshJobs = mutableMapOf<String, Job>()
 
     init {
@@ -524,6 +535,74 @@ class ModelSetupViewModel(
                     form = AddForm.of(ProviderPresets.all.first()), formOpen = false,
                     probeNote = probeNote(probed), pickToProbe = saved.id.takeIf { noneUsable },
                 ))
+            }
+        }
+    }
+
+    /** 改「用 Google 免費開始」裡貼上的 Key;改了就清掉上次的失敗原因。 */
+    fun setGoogleKey(key: String) =
+        _state.update { it.copy(googleStart = it.googleStart.copy(key = key, error = null)) }
+
+    /**
+     * 用 Google 免費 API 一鍵開始:拿貼上的 Key 先列一次模型(驗 Key),再釘版試呼叫免費模型
+     * [GOOGLE_FREE_MODEL](要真的叫得動工具);都過了就比照 [testAndSave] 存下 Gemini 這家、
+     * 把釘版模型設為主模型。中間任何一步失敗:說原因、什麼都不存。
+     */
+    fun startWithGoogle() {
+        val start = _state.value.googleStart
+        val key = start.key.trim()
+        if (key.isEmpty() || start.busy) return
+        _state.update { it.copy(googleStart = it.googleStart.copy(busy = true, error = null)) }
+        googleJob?.cancel()
+        googleJob = scope.launch {
+            try {
+                val preset = ProviderPresets.all.first { it.kind == ProviderConfig.Kind.Gemini }
+                fun fail(message: String) =
+                    _state.update { it.copy(googleStart = it.googleStart.copy(busy = false, error = message)) }
+                val models = when (val r = withContext(io) { store.listModels(preset.kind, preset.baseUrl, key, preset.sessionHeader) }) {
+                    is ModelListResult.Ok -> r.models
+                    is ModelListResult.Failed -> { fail(r.message); return@launch }
+                }
+                val endpoint = models.firstOrNull { it.id == GOOGLE_FREE_MODEL }?.endpoint
+                val probed = try {
+                    withContext(io) {
+                        withTimeout(PROBE_TIMEOUT_MS) {
+                            store.probe(preset.kind, preset.baseUrl, key, preset.sessionHeader, GOOGLE_FREE_MODEL, endpoint, preset.capabilities)
+                        }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    fail(tr(R.string.model_probe_timeout, GOOGLE_FREE_MODEL, (PROBE_TIMEOUT_MS / 1000).toInt())); return@launch
+                }
+                when (probed) {
+                    ProbeResult.ToolCalled -> {
+                        val listed = models.ifEmpty { listOf(ListedModel(GOOGLE_FREE_MODEL)) }
+                        withContext(io) {
+                            val p = store.connect(preset.label, preset.kind, preset.baseUrl, key, listed, preset.sessionHeader, setOf(GOOGLE_FREE_MODEL))
+                            if (store.roles.value.main == null) {
+                                val options = ModelOptions.ofProvider(p, store.list())
+                                use(ModelRole.Main, p, GOOGLE_FREE_MODEL, options)
+                            }
+                        }
+                        _state.update { snapshot(it.copy(googleStart = GoogleStartUi())) }
+                    }
+                    ProbeResult.NoToolCall -> fail(tr(R.string.google_start_no_tools, GOOGLE_FREE_MODEL))
+                    // 走到試呼叫這步,列模型已證明 Key 有效:比照 probeModel 分流,只有認證錯誤才說 Key 不能用,
+                    // 模型沒開通、不支援工具、沒有這個模型、服務端出錯都各說各的原因,不誤導使用者去查 Key
+                    is ProbeResult.Failed -> fail(
+                        when (val e = probed.error) {
+                            is ModelError.Auth -> tr(R.string.google_start_failed, e.message.orEmpty())
+                            is ModelError.ModelNotAvailable -> tr(R.string.model_probe_not_available, GOOGLE_FREE_MODEL, e.detail.ifEmpty { e.message.orEmpty() })
+                            is ModelError.ToolsUnsupported -> tr(R.string.model_probe_no_tools_pick, GOOGLE_FREE_MODEL)
+                            is ModelError.ModelNotFound -> tr(R.string.model_probe_not_found, GOOGLE_FREE_MODEL, ModelSetupCopy.modelExample(preset.kind))
+                            else -> tr(R.string.model_probe_failed, GOOGLE_FREE_MODEL, e.message.orEmpty())
+                        },
+                    )
+                }
+            } catch (e: CancellationException) {
+                // 被取消(例如頁面銷毀):busy 必須復位,並照存檔現況刷新一次——取消若落在存檔之後,
+                // 服務商其實已存進去,畫面要跟上,不能留一個卡死的「驗證中」
+                _state.update { snapshot(it.copy(googleStart = it.googleStart.copy(busy = false))) }
+                throw e
             }
         }
     }
@@ -1204,6 +1283,8 @@ class ModelSetupViewModel(
     companion object {
         /** 「测试并保存」里试调用最多等多久。 */
         const val PROBE_TIMEOUT_MS = 20_000L
+        /** 免費開始釘版的模型:免費層實測可生成、看得懂圖、叫得動工具。 */
+        const val GOOGLE_FREE_MODEL = "gemini-3.5-flash-lite"
 
         /** 「测试并保存」有列表时至多试几个模型:先试的那个,加没通过时接着试的 2 个。 */
         const val PROBE_CANDIDATES = 3

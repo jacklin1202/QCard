@@ -10,6 +10,9 @@ enum class OnboardingStep { Welcome, Model, Phone }
  * - 欢迎和配置模型:还没有主模型、也没在上手流程里配过模型时才走。已经配过模型的(包括老用户)直接跳过。
  * - 手机操作:系统够新、手机操作还没就绪、引导没看过时走。
  */
+/** 「用 Google 免費 API 開始」卡片要不要出現:還沒有主模型、而且使用者沒按過略過。 */
+fun googleStartVisible(hasNoMainModel: Boolean, dismissed: Boolean): Boolean = hasNoMainModel && !dismissed
+
 object Onboarding {
     data class Inputs(
         val hasMainModel: Boolean,
@@ -47,8 +50,16 @@ class OnboardingState(context: Context) {
         prefs.edit().putBoolean(MODEL_DONE, true).apply()
     }
 
+    /** 「用 Google 免費開始」卡片按過略過沒有;按過就不再出現(已有自己 API 的人不被擋路)。 */
+    fun googleStartDismissed(): Boolean = prefs.getBoolean(GOOGLE_DISMISSED, false)
+
+    fun markGoogleStartDismissed() {
+        prefs.edit().putBoolean(GOOGLE_DISMISSED, true).apply()
+    }
+
     private companion object {
         const val PREFS = "onboarding"
         const val MODEL_DONE = "model_setup_done"
+        const val GOOGLE_DISMISSED = "google_start_dismissed"
     }
 }

@@ -203,4 +203,13 @@
     <string name="models_daily_token_budget">服务商每日 Token 预算</string>
     <string name="models_daily_token_budget_sub">按本地日历日统计这家所有模型和用途的已报告输入与输出 Token。达到预算后不再发起下一次请求；在途请求可能超量，未报告用量按 0 计。本地日期变更后自动恢复。</string>
     <string name="models_daily_token_budget_save_failed">预算保存失败，原设置未变。</string>
+    <string name="google_start_title">用 Google 免费开始</string>
+    <string name="google_start_body">还没有 API？用 Google 账号到 Google AI Studio 免费申请一组密钥，贴回这里，Q卡 会自动用免费的 Gemini 模型设置好。免费额度有每日上限，而且 Google 可能会用免费层的内容来改进它的产品。</string>
+    <string name="google_start_open">申请免费密钥</string>
+    <string name="google_start_key_hint">贴上你的 Google AI 密钥</string>
+    <string name="google_start_go">免费开始使用</string>
+    <string name="google_start_busy">正在验证密钥…</string>
+    <string name="google_start_skip">跳过</string>
+    <string name="google_start_no_tools">%1$s 有回复但没有调用工具，没办法跑任务，所以没有保存任何设置。</string>
+    <string name="google_start_failed">这组密钥不能用（%1$s），没有保存任何设置，检查后再试一次。</string>
 </resources>

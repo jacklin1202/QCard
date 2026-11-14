@@ -206,4 +206,13 @@
     <string name="models_daily_token_budget">Daily token budget</string>
     <string name="models_daily_token_budget_sub">Counts all models and purposes for this provider in the local calendar day. Only reported input and output tokens count. At the limit, the next request is blocked; in-flight requests may exceed it. Resets when the local date changes.</string>
     <string name="models_daily_token_budget_save_failed">The budget could not be saved. The previous setting is still active.</string>
+    <string name="google_start_title">Start free with Google</string>
+    <string name="google_start_body">No API yet? Get a free key from Google AI Studio with your Google account, paste it here, and QCard sets itself up with a free Gemini model. The free tier has daily limits, and Google may use free-tier content to improve its products.</string>
+    <string name="google_start_open">Get a free key</string>
+    <string name="google_start_key_hint">Paste your Google AI key</string>
+    <string name="google_start_go">Start (free)</string>
+    <string name="google_start_busy">Checking your key…</string>
+    <string name="google_start_skip">Skip</string>
+    <string name="google_start_no_tools">%1$s answered but did not call the tool, so it cannot run tasks. Nothing was saved.</string>
+    <string name="google_start_failed">That key did not work (%1$s). Nothing was saved — check the key and try again.</string>
 </resources>
