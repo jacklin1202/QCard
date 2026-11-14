@@ -75,6 +75,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -95,6 +96,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wangzan101.mika.confirm.ConfirmationCopy
+import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.core.userscreen.CapturedScreen
 import com.wangzan101.mika.ui.MarkdownText
 import com.wangzan101.mika.ui.FollowUpMode
@@ -243,7 +245,7 @@ fun CapsuleCard(
     val field = CapsuleCards.input(card)
     // 任务还在进行(干活中、Mika 问你、等条件)时,停止和对话页一样放在输入框右边,不另占一个按钮
     val stopKey = CapsuleCards.stopKey(card)
-    val h = if (height == Dp.Unspecified) (LocalConfiguration.current.screenHeightDp * CardDocking.SHARE).dp else height
+    val h = if (height == Dp.Unspecified) (LocalConfiguration.current.screenHeightDp * CardDocking.SHARE * cardScaleFactor()).dp else height
     val report by rememberUpdatedState(onHandle)
     val handle = Modifier.testTag("capsule-header").onGloballyPositioned { c ->
         val b = c.boundsInWindow()
@@ -520,8 +522,15 @@ private val KeySize = 34.dp
 
 private const val TITLE_MAX = 12
 
+/** 用户设的卡片大小倍率(设置 › 浮动胶囊);读不到(预览、测试)时按默认档。 */
 @Composable
-private fun cardWidth() = minOf(CardWidth, (LocalConfiguration.current.screenWidthDp - 24).coerceAtLeast(240).dp)
+private fun cardScaleFactor(): Float {
+    val context = LocalContext.current
+    return remember { runCatching { FeatureFlags.get(context).capsuleCardScale().factor }.getOrDefault(CapsuleCardScale.DEFAULT.factor) }
+}
+
+@Composable
+private fun cardWidth() = minOf(CardWidth * cardScaleFactor(), (LocalConfiguration.current.screenWidthDp - 24).coerceAtLeast(240).dp)
 
 /** 卡片的底:[fixed] 时就是 [height] 高(对话卡片),否则按内容高、最多 [height](任务卡片)。 */
 @Composable

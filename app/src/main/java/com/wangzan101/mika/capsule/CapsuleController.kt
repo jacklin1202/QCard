@@ -916,7 +916,7 @@ class CapsuleController(
         val w = cardWindow ?: return
         val c = card ?: return
         val a = cardArea() ?: return
-        windowOn?.overlays()?.area()?.let { cardHeight = CardDocking.maxHeight(it.height, a, room()) }
+        windowOn?.overlays()?.area()?.let { cardHeight = CardDocking.maxHeight(it.height, a, room(), cardShare()) }
         val base = area(ime = false) ?: a
         val expected = if (c is CardView.Chat) cardHeight + 2 * room() else dp(PILL_DP)
         cardY = CardDocking.y(cardFraction, base, a, cardFull(base), maxOf(w.height, expected))
@@ -924,9 +924,12 @@ class CapsuleController(
         w.place(OverlayPlacement(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, cardY))
     }
 
+    /** 卡片高度占屏幕的比例:基准 [CardDocking.SHARE] 按用户设的卡片大小倍率放大。 */
+    private fun cardShare(): Float = CardDocking.SHARE * flags.capsuleCardScale().factor
+
     /** 最高的卡片(对话卡片)在没让输入法的范围 [base] 里的窗口高(含阴影边):卡片上边的比例按它算。 */
     private fun cardFull(base: DockArea): Int =
-        CardDocking.maxHeight(windowOn?.overlays()?.area()?.height ?: 0, base, room()) + 2 * room()
+        CardDocking.maxHeight(windowOn?.overlays()?.area()?.height ?: 0, base, room(), cardShare()) + 2 * room()
 
     /**
      * 能拖哪里:胶囊和那一条整个能拖;卡片只有按着标题栏能拖(中间上下滑是滚动),放大画面时不能拖。

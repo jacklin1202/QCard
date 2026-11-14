@@ -83,6 +83,8 @@
     <string name="capsule_mode_always_detail">작업이 없어도 화면에 Q卡 아이콘을 계속 표시해요</string>
     <string name="capsule_idle_opacity">대기 중 불투명도</string>
     <string name="capsule_idle_opacity_detail">몇 초 동안 만지지 않았을 때의 농도이며, 처리가 필요한 상태는 항상 완전히 보여요</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">저장된 경로</string>
     <string name="loading">불러오는 중</string>
     <plurals name="routes_count">

@@ -103,11 +103,12 @@ object CardDocking {
     const val DEFAULT_FRACTION = 0.5f
 
     /**
-     * 看得见的卡片最高多高(对话卡片就是这么高):屏幕高 [screenHeight] 的 [SHARE],但不超过 [area] 里放得下的
-     * (上下各让出阴影边 [room]);输入法弹出时 [area] 已收到它上面,卡片跟着变矮,中间那段缩,输入框仍看得见。
+     * 看得见的卡片最高多高(对话卡片就是这么高):屏幕高 [screenHeight] 的 [share](默认 [SHARE],用户调了卡片
+     * 大小就按倍率放大),但不超过 [area] 里放得下的(上下各让出阴影边 [room]);输入法弹出时 [area] 已收到它
+     * 上面,卡片跟着变矮,中间那段缩,输入框仍看得见。
      */
-    fun maxHeight(screenHeight: Int, area: DockArea, room: Int): Int =
-        minOf((screenHeight * SHARE).roundToInt(), area.bottom - area.top - 2 * room).coerceAtLeast(0)
+    fun maxHeight(screenHeight: Int, area: DockArea, room: Int, share: Float = SHARE): Int =
+        minOf((screenHeight * share).roundToInt(), area.bottom - area.top - 2 * room).coerceAtLeast(0)
 
     /**
      * 按比例 [fraction] 摆、高为 [h] 的卡片窗口的上边:先在没让输入法的范围 [base] 里按最高的卡片(窗口高 [full])定上边,

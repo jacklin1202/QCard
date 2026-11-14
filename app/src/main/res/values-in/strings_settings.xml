@@ -83,6 +83,8 @@
     <string name="capsule_mode_always_detail">Menampilkan ikon Q卡 di layar walau tidak ada tugas</string>
     <string name="capsule_idle_opacity">Opasitas saat diam</string>
     <string name="capsule_idle_opacity_detail">Setelah beberapa detik tidak disentuh; hal yang memerlukan perhatian Anda tetap terlihat penuh</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">Rute tersimpan</string>
     <string name="loading">Memuat</string>
     <plurals name="routes_count">

@@ -83,6 +83,8 @@
     <string name="capsule_mode_always_detail">タスクがないときも、Q卡 のアイコンを画面に表示し続けます</string>
     <string name="capsule_idle_opacity">待機時の不透明度</string>
     <string name="capsule_idle_opacity_detail">数秒間操作しないときの表示の濃さ。対応が必要な状態は常に完全不透明で表示します</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">保存した手順</string>
     <string name="loading">読み込み中</string>
     <plurals name="routes_count">

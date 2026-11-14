@@ -98,6 +98,8 @@
     <string name="capsule_mode_always_detail">تُبقي أيقونة Q卡 على الشاشة حتى عند عدم وجود مهام</string>
     <string name="capsule_idle_opacity">عتامة الكبسولة عند السكون</string>
     <string name="capsule_idle_opacity_detail">بعد ثوانٍ من دون لمسها؛ يبقى كل ما يحتاج إلى انتباهك ظاهرًا بالكامل</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">المسارات المحفوظة</string>
     <string name="loading">جارٍ التحميل</string>
     <plurals name="routes_count">

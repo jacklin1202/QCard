@@ -89,6 +89,8 @@
     <string name="capsule_mode_always_detail">Mantém um ícone do Q卡 na tela mesmo sem tarefas</string>
     <string name="capsule_idle_opacity">Opacidade em repouso</string>
     <string name="capsule_idle_opacity_detail">Após alguns segundos sem toque; o que precisar da sua atenção continua totalmente visível</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">Roteiros salvos</string>
     <string name="loading">Carregando</string>
     <plurals name="routes_count">

@@ -122,6 +122,13 @@ class CapsuleDockTest {
         assertEquals(580, CardDocking.maxHeight(1000, landscape, room = 10))
     }
 
+    @Test fun cardCapScalesWithShare() {
+        // 用户把卡片调大:按倍率放大占屏幕的比例(2000 * 0.58 * 1.3 = 1508),但仍受放得下的范围封顶
+        assertEquals(1508, CardDocking.maxHeight(2000, area, room = 10, share = CardDocking.SHARE * 1.3f))
+        val up = area.above(1200, gap = 20, room = 10)
+        assertEquals(1190 - 90 - 20, CardDocking.maxHeight(2000, up, room = 10, share = CardDocking.SHARE * 1.6f))
+    }
+
     @Test fun cardTopFollowsItsFraction() {
         // 上边在 90..(1950 - 最高的卡片) 之间按比例摆:最高的卡片正中、顶、底
         assertEquals(90 + 340, CardDocking.y(0.5f, area, area, full, full))

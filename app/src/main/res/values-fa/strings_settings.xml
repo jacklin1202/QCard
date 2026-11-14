@@ -97,6 +97,8 @@
     <string name="capsule_mode_always_detail">حتی بدون کار، نماد میکا را روی صفحه نگه می‌دارد</string>
     <string name="capsule_idle_opacity">میزان وضوح در حالت غیرفعال</string>
     <string name="capsule_idle_opacity_detail">پس از چند ثانیه بدون لمس اعمال می‌شود؛ موارد نیازمند توجه شما کاملاً قابل مشاهده می‌مانند</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">مسیرهای ذخیره‌شده</string>
     <string name="loading">در حال بارگذاری</string>
     <plurals name="routes_count">

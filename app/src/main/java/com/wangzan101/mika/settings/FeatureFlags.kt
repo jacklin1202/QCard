@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.wangzan101.mika.capsule.CapsuleDock
 import com.wangzan101.mika.capsule.CardDocking
+import com.wangzan101.mika.capsule.CapsuleCardScale
 import com.wangzan101.mika.capsule.CapsuleIdleOpacity
 import com.wangzan101.mika.capsule.CapsuleMode
 import com.wangzan101.mika.capsule.DockSide
@@ -146,6 +147,13 @@ class FeatureFlags(private val prefs: SharedPreferences) {
         prefs.edit().putString(CAPSULE_MODE, mode.name).commit()
     }
 
+    /** 展开卡片的大小(百分比三档);摆卡片时现读,改完下次展开就是新大小。 */
+    fun capsuleCardScale(): CapsuleCardScale = CapsuleCardScale.parse(prefs.getInt(CAPSULE_CARD_SCALE, CapsuleCardScale.DEFAULT.percent))
+
+    fun setCapsuleCardScale(scale: CapsuleCardScale) {
+        prefs.edit().putInt(CAPSULE_CARD_SCALE, scale.percent).commit()
+    }
+
     /** 胶囊开关的当前值,之后每次改动再发一次。 */
     fun capsuleModeChanges(): Flow<CapsuleMode> = callbackFlow {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -239,6 +247,7 @@ class FeatureFlags(private val prefs: SharedPreferences) {
         private const val THEME_MODE = "theme_mode"
         private const val PERSONAL_START = "personal_start"
         private const val CAPSULE_MODE = "capsule_mode"
+        private const val CAPSULE_CARD_SCALE = "capsule_card_scale"
         private const val CAPSULE_IDLE_OPACITY = "capsule_idle_opacity"
         private const val QUIT_REQUESTED = "quit_requested"
         private const val CAPSULE_SIDE = "capsule_side"

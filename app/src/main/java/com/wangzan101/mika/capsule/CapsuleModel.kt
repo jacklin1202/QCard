@@ -34,6 +34,18 @@ enum class CapsuleIdleOpacity(val percent: Int) {
     }
 }
 
+/** 展开卡片的大小;滑块只停在这三档,设置里存百分比。默认比原大小大一号:大屏上原大小显得太小。 */
+enum class CapsuleCardScale(val percent: Int) {
+    P100(100), P130(130), P160(160);
+
+    val factor: Float get() = percent / 100f
+
+    companion object {
+        val DEFAULT = P130
+        fun parse(percent: Int): CapsuleCardScale = entries.firstOrNull { it.percent == percent } ?: DEFAULT
+    }
+}
+
 /**
  * 一个任务此刻的样子:编号([TaskRun.key])、所在对话、状态、接管走到哪一步;
  * 卡片还要它的目标 [goal] 和这一问一答此刻的样子 [exchange](步骤、要你做的事、结果,和对话页同一套推法)。

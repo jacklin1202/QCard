@@ -92,6 +92,8 @@
     <string name="capsule_mode_always_detail">Значок Q卡 остаётся на экране, даже когда задач нет</string>
     <string name="capsule_idle_opacity">Непрозрачность в покое</string>
     <string name="capsule_idle_opacity_detail">Через несколько секунд без касания; всё, что требует внимания, остаётся полностью видимым</string>
+    <string name="capsule_card_scale">Card size</string>
+    <string name="capsule_card_scale_detail">Size of the expanded task card</string>
     <string name="routes_saved">Сохранённые маршруты</string>
     <string name="loading">Загрузка</string>
     <plurals name="routes_count">

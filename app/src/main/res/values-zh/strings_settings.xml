@@ -83,6 +83,8 @@
     <string name="capsule_mode_always_detail">没有任务时也留一颗 Q卡图标</string>
     <string name="capsule_idle_opacity">静置不透明度</string>
     <string name="capsule_idle_opacity_detail">几秒没碰后的显示程度；需要你处理时始终完整显示</string>
+    <string name="capsule_card_scale">卡片大小</string>
+    <string name="capsule_card_scale_detail">展开后任务卡片的大小</string>
     <string name="routes_saved">已记住的操作路线</string>
     <string name="loading">正在读取</string>
     <plurals name="routes_count">
