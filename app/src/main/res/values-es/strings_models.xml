@@ -219,4 +219,5 @@
     <string name="google_start_skip">Skip</string>
     <string name="google_start_no_tools">%1$s answered but did not call the tool, so it cannot run tasks. Nothing was saved.</string>
     <string name="google_start_failed">That key did not work (%1$s). Nothing was saved — check the key and try again.</string>
+    <string name="google_start_auth_detail">the provider rejected this key</string>
 </resources>

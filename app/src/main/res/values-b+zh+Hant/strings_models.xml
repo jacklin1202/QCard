@@ -211,4 +211,5 @@
     <string name="google_start_skip">略過</string>
     <string name="google_start_no_tools">%1$s 有回話但沒有呼叫工具，沒辦法跑任務，所以沒有儲存任何設定。</string>
     <string name="google_start_failed">這組金鑰不能用（%1$s），沒有儲存任何設定，檢查後再試一次。</string>
+    <string name="google_start_auth_detail">服務商拒絕了這組金鑰</string>
 </resources>

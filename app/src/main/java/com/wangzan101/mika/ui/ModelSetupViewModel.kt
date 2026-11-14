@@ -590,7 +590,11 @@ class ModelSetupViewModel(
                     // 模型沒開通、不支援工具、沒有這個模型、服務端出錯都各說各的原因,不誤導使用者去查 Key
                     is ProbeResult.Failed -> fail(
                         when (val e = probed.error) {
-                            is ModelError.Auth -> tr(R.string.google_start_failed, e.message.orEmpty())
+                            is ModelError.Auth -> {
+                                // Auth 的訊息現行是固定文案、理論上不會空;真空了給一句預設說明,不印空括號
+                                val detail = e.message.orEmpty().ifBlank { tr(R.string.google_start_auth_detail) }
+                                tr(R.string.google_start_failed, detail)
+                            }
                             is ModelError.ModelNotAvailable -> tr(R.string.model_probe_not_available, GOOGLE_FREE_MODEL, e.detail.ifEmpty { e.message.orEmpty() })
                             is ModelError.ToolsUnsupported -> tr(R.string.model_probe_no_tools_pick, GOOGLE_FREE_MODEL)
                             is ModelError.ModelNotFound -> tr(R.string.model_probe_not_found, GOOGLE_FREE_MODEL, ModelSetupCopy.modelExample(preset.kind))
