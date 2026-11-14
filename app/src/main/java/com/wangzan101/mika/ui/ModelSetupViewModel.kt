@@ -994,6 +994,22 @@ class ModelSetupViewModel(
         }
     }
 
+    /** 把第 [slot] 位备援升为主模型,和主模型交换位置(原主模型落到这一位)。 */
+    fun promoteFallback(slot: Int) {
+        scope.launch {
+            withContext(io) { store.promoteMainFallback(slot) }
+            sync()
+        }
+    }
+
+    /** 把第 [from] 位备援移到第 [to] 位。 */
+    fun moveFallback(from: Int, to: Int) {
+        scope.launch {
+            withContext(io) { store.moveMainFallback(from, to) }
+            sync()
+        }
+    }
+
     /** 看图、轻量的固定选项:「用主模型」或(只有看图)「不用」。 */
     fun choose(role: ModelRole, choice: RoleChoice) {
         scope.launch {

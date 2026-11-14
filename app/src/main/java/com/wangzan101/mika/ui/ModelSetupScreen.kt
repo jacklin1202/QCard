@@ -237,7 +237,7 @@ fun ModelSetupScreen(
                     setModel = vm::setModel, setManual = vm::setManual, setName = vm::setName,
                     testAndSave = vm::testAndSave, saveUntested = vm::saveWithoutTest,
                     openForm = vm::openForm, closeForm = vm::closeForm,
-                    openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, pickFallback = { pickingFallback = it }, next = onDone, openSpeech = onOpenSpeech,
+                    openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, pickFallback = { pickingFallback = it }, promoteFallback = vm::promoteFallback, moveFallback = vm::moveFallback, next = onDone, openSpeech = onOpenSpeech,
                     openUsage = onOpenUsage,
                     openSignIn = { signInSheet = it },
                     setReasoningEffort = vm::setReasoningEffort,
@@ -289,6 +289,10 @@ class ModelSetupActions(
     val openProvider: (String) -> Unit = {},
     val pickRole: (ModelRole) -> Unit = {},
     val pickFallback: (Int) -> Unit = {},
+    /** 把第几位备援升为主模型,和主模型交换位置。 */
+    val promoteFallback: (Int) -> Unit = {},
+    /** 把备援从一位移到另一位(调整接手顺序)。 */
+    val moveFallback: (Int, Int) -> Unit = { _, _ -> },
     /** 打开「语音转文字」的选择页;为 null 时不显示这张卡(上手流程)。 */
     val openSpeech: (() -> Unit)? = null,
     /** 打开 Token 用量;为 null 时不显示入口(上手流程)。 */
@@ -327,7 +331,7 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
                     RolesSection(ui, onPick, actions.setReasoningEffort, null)
                     FooterNote(ModelSetupCopy.ONBOARDING_NOTE)
                 } else {
-                    RolesSection(ui, onPick, actions.setReasoningEffort, actions.openSpeech, actions.setModelContext, actions.pickFallback)
+                    RolesSection(ui, onPick, actions.setReasoningEffort, actions.openSpeech, actions.setModelContext, actions.pickFallback, actions.promoteFallback, actions.moveFallback)
                     ProvidersSection(ui, actions)
                     actions.openUsage?.let { openUsage ->
                         GroupCard {
@@ -570,6 +574,8 @@ internal object SignInPage {
 private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReasoning: (ModelRole, String?) -> Unit,
     onSpeech: (() -> Unit)?, onContext: ((String, ModelContextSettings) -> Boolean)? = null,
     onPickFallback: ((Int) -> Unit)? = null,
+    onPromoteFallback: ((Int) -> Unit)? = null,
+    onMoveFallback: ((Int, Int) -> Unit)? = null,
 ) {
     GroupLabel(ModelsCopy.ROLES)
     GroupCard {
@@ -599,6 +605,24 @@ private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReason
             for (slot in 0 until MAX_MAIN_FALLBACKS) {
                 RoleCard(ModelsCopy.FALLBACK_ICON, ModelsCopy.fallbackLabel(slot), ModelsCopy.fallbackLine(ui, slot), tag = "role-fallback-$slot") {
                     onPickFallback(slot)
+                }
+                // 已设的备援多一行小动作:升为主模型(和主模型交换)、往前/往后挪一位,不必重选
+                val chainSize = ui.roles.mainFallbacks.size
+                if (ui.roles.mainFallbacks.getOrNull(slot) != null && (onPromoteFallback != null || onMoveFallback != null)) {
+                    Column(Modifier.padding(start = 70.dp, end = 16.dp)) {
+                        Hairline(start = 0.dp)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (onPromoteFallback != null) {
+                                ModelOptionButton(stringResource(R.string.main_fallback_promote), "fallback-promote-$slot", Modifier.weight(1f)) { onPromoteFallback(slot) }
+                            }
+                            if (onMoveFallback != null && slot > 0) {
+                                ModelOptionButton(stringResource(R.string.main_fallback_move_up), "fallback-up-$slot", Modifier.weight(1f)) { onMoveFallback(slot, slot - 1) }
+                            }
+                            if (onMoveFallback != null && slot < chainSize - 1) {
+                                ModelOptionButton(stringResource(R.string.main_fallback_move_down), "fallback-down-$slot", Modifier.weight(1f)) { onMoveFallback(slot, slot + 1) }
+                            }
+                        }
+                    }
                 }
             }
         }

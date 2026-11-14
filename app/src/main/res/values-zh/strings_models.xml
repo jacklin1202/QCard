@@ -66,6 +66,9 @@
     <string name="main_fallback_pick">选一个备援模型</string>
     <string name="main_fallback_clear">不设备援</string>
     <string name="main_fallback_hint">平常用主模型；它额度用完或出错时，自动换备援模型接手。</string>
+    <string name="main_fallback_promote">升为主模型</string>
+    <string name="main_fallback_move_up">上移</string>
+    <string name="main_fallback_move_down">下移</string>
     <string name="main_fallback_failed">备援模型设置失败</string>
     <string name="main_fallback_is_main">这个模型就是当前主模型，不能同时当备援</string>
     <string name="role_vision_hint">读屏时把截图给它看，界面复杂时更准。不选也能用，只靠文字读屏。</string>

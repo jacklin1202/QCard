@@ -579,6 +579,44 @@ class ProviderStore(
         return true
     }
 
+    /**
+     * 把备援链第 [slot] 位升为主模型,和主模型交换位置:原主模型落到这一位继续当备援,
+     * 一次到位,不用重选。原主模型还没选时就是直接升位,链顺势少一位。主模型换人后
+     * 它原来按用途存的思考强度照选主模型的老规矩清掉(见 [RoleChoices.with])。
+     */
+    @Synchronized
+    fun promoteMainFallback(slot: Int): Boolean {
+        val roles = _roles.value
+        val chain = roles.mainFallbacks
+        if (slot !in chain.indices) return false
+        val promoted = chain[slot]
+        val oldMain = roles.main
+        if (promoted == oldMain) return true
+        val nextChain = chain.toMutableList().apply {
+            if (oldMain != null) this[slot] = oldMain else removeAt(slot)
+        }
+        _roles.value = roles.copy(
+            main = promoted,
+            mainFallbacks = nextChain,
+            reasoningEfforts = roles.reasoningEfforts - ModelRole.Main,
+        )
+        prune()
+        writeConfig()
+        return true
+    }
+
+    /** 把备援链第 [from] 位移到第 [to] 位,中间的顺势挪开;链外、原地不动都拒绝。 */
+    @Synchronized
+    fun moveMainFallback(from: Int, to: Int): Boolean {
+        val roles = _roles.value
+        val chain = roles.mainFallbacks
+        if (from !in chain.indices || to !in chain.indices || from == to) return false
+        val next = chain.toMutableList().apply { add(to, removeAt(from)) }
+        _roles.value = roles.copy(mainFallbacks = next)
+        writeConfig()
+        return true
+    }
+
     /** 只改这个用途;不支持的协议、跟随主模型的用途或列表明确不支持的档位不接受。 */
     @Synchronized
     fun setReasoningEffort(role: ModelRole, effort: String?): Boolean {

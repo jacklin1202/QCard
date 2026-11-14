@@ -201,6 +201,9 @@
     <string name="main_fallback_pick">Pick a fallback model</string>
     <string name="main_fallback_clear">No fallback</string>
     <string name="main_fallback_hint">The main model runs first. If it runs out of quota or fails, the fallback takes over automatically.</string>
+    <string name="main_fallback_promote">Make main model</string>
+    <string name="main_fallback_move_up">Move up</string>
+    <string name="main_fallback_move_down">Move down</string>
     <string name="main_fallback_failed">Could not set the fallback model</string>
     <string name="main_fallback_is_main">This is the current main model, so it cannot also be its fallback</string>
 </resources>

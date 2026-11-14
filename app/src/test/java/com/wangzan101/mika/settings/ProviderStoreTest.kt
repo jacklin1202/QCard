@@ -103,6 +103,49 @@ class ProviderStoreTest {
         assertEquals(emptyList<String>(), s.roles.value.mainFallbacks)
     }
 
+    @Test fun promoteFallbackSwapsWithMain() {
+        val s = store()
+        s.saveAsMain(cfg("m"), "sk-m")
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        assertTrue(s.promoteMainFallback(0))
+        assertEquals("a", s.roles.value.main)
+        assertEquals(listOf("m", "b"), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun promoteFallbackWithoutMainJustPromotes() {
+        val s = store()
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        assertTrue(s.promoteMainFallback(1))
+        assertEquals("b", s.roles.value.main)
+        assertEquals(listOf("a"), s.roles.value.mainFallbacks)
+    }
+
+    @Test fun promoteFallbackRejectsEmptySlot() {
+        val s = store()
+        s.saveAsMain(cfg("m"), "sk-m")
+        assertFalse(s.promoteMainFallback(0))
+        assertEquals("m", s.roles.value.main)
+    }
+
+    @Test fun moveFallbackReordersChain() {
+        val s = store()
+        s.save(cfg("a"), "sk-a")
+        assertTrue(s.setMainFallback(0, "a"))
+        s.save(cfg("b"), "sk-b")
+        assertTrue(s.setMainFallback(1, "b"))
+        assertTrue(s.moveMainFallback(1, 0))
+        assertEquals(listOf("b", "a"), s.roles.value.mainFallbacks)
+        assertFalse(s.moveMainFallback(0, 0))
+        assertFalse(s.moveMainFallback(0, 2))
+        assertEquals(listOf("b", "a"), s.roles.value.mainFallbacks)
+    }
+
     @Test fun mainFallbackRejectsSlotAtMax() {
         // 位子只有 0..MAX-1(UI 也只显示这些):slot == MAX 要拒(MK-1 B-D3)。
         val s = store()
